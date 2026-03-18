@@ -1,0 +1,212 @@
+.grow-dashboard {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  color: #e5e5e5;
+  font-family: system-ui, sans-serif;
+}
+
+/* header */
+.grow-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.grow-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.grow-vpd-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* controls */
+.grow-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.grow-select {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #e5e5e5;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.grow-select:focus {
+  outline: none;
+  border-color: #555;
+}
+
+.time-range-picker {
+  display: flex;
+  gap: 4px;
+}
+
+.range-btn {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.range-btn:hover {
+  background: #2a2a2a;
+  color: #e5e5e5;
+}
+
+.range-btn.active {
+  background: #2d2d2d;
+  border-color: #555;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* current readings */
+.current-readings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.reading-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 14px 20px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.reading-attribute {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.reading-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.reading-unit {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #aaa;
+  margin-left: 2px;
+}
+
+.reading-age {
+  font-size: 0.72rem;
+  color: #555;
+  margin-top: 4px;
+}
+
+/* charts */
+.chart-section {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 10px;
+  padding: 16px 8px 8px;
+  margin-bottom: 16px;
+}
+
+.chart-title {
+  margin: 0 0 12px 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ccc;
+}
+
+/* loading / empty */
+.grow-loading,
+.grow-empty {
+  text-align: center;
+  color: #555;
+  padding: 48px 0;
+  font-size: 0.95rem;
+}
+
+/* VPD reference card */
+.vpd-reference-card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-top: 24px;
+}
+
+.vpd-reference-card h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.vpd-subtitle {
+  margin: 0 0 16px;
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.vpd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.vpd-table tr {
+  border-top: 1px solid #222;
+}
+
+.vpd-table td {
+  padding: 7px 8px;
+  vertical-align: middle;
+}
+
+.vpd-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.vpd-range {
+  color: #ccc;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-width: 110px;
+}
+
+.vpd-note {
+  color: #aaa;
+  min-width: 140px;
+}
+
+.vpd-desc {
+  color: #666;
+  font-size: 0.8rem;
+}

@@ -1,0 +1,330 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceArea, Legend,
+} from 'recharts'
+import { supabase } from '../lib/supabase'
+import { celsiusFromFahrenheit, computeVpd, VPD_ZONE_COLORS, VPD_ZONE_LABELS, vpdZone } from '../lib/vpd'
+import './GrowDashboard.css'
+
+// ── types ────────────────────────────────────────────────────────────────────
+
+interface Device { device_id: string; device_name: string }
+
+interface Reading {
+  attribute: string
+  value: number
+  unit: string | null
+  recorded_at: string
+}
+
+interface ChartPoint {
+  ts: number
+  temperature?: number
+  humidity?: number
+  vpd?: number
+}
+
+// ── constants ────────────────────────────────────────────────────────────────
+
+const TIME_RANGES = [
+  { label: '6h',  hours: 6 },
+  { label: '12h', hours: 12 },
+  { label: '24h', hours: 24 },
+  { label: '7d',  hours: 168 },
+  { label: '30d', hours: 720 },
+]
+
+const BUCKET_MS = 5 * 60 * 1000   // 5-minute buckets for chart
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatShortTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function mergeIntoChartPoints(readings: Reading[]): ChartPoint[] {
+  const buckets = new Map<number, { temp?: { value: number; unit: string }; humidity?: number }>()
+
+  for (const r of readings) {
+    const ts = new Date(r.recorded_at).getTime()
+    const bucket = Math.round(ts / BUCKET_MS) * BUCKET_MS
+    if (!buckets.has(bucket)) buckets.set(bucket, {})
+    const b = buckets.get(bucket)!
+
+    if (r.attribute === 'temperature') {
+      b.temp = { value: r.value, unit: r.unit ?? '°F' }
+    } else if (r.attribute === 'humidity') {
+      b.humidity = r.value
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([ts, b]) => {
+      let vpd: number | undefined
+      if (b.temp !== undefined && b.humidity !== undefined) {
+        const tempC = b.temp.unit.includes('F')
+          ? celsiusFromFahrenheit(b.temp.value)
+          : b.temp.value
+        vpd = computeVpd(tempC, b.humidity)
+      }
+      return {
+        ts,
+        temperature: b.temp?.value,
+        humidity: b.humidity,
+        vpd,
+      }
+    })
+}
+
+// ── data fetching ────────────────────────────────────────────────────────────
+
+async function fetchDevices(): Promise<Device[]> {
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('device_id, device_name')
+    .order('device_name')
+  if (!data) return []
+  const seen = new Set<string>()
+  return data.filter(d => {
+    if (seen.has(d.device_id)) return false
+    seen.add(d.device_id)
+    return true
+  })
+}
+
+async function fetchReadings(deviceId: string, hours: number): Promise<Reading[]> {
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString()
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', deviceId)
+    .gte('recorded_at', since)
+    .in('attribute', ['temperature', 'humidity'])
+    .order('recorded_at', { ascending: true })
+  return data ?? []
+}
+
+async function fetchLatest(deviceId: string): Promise<Reading[]> {
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', deviceId)
+    .order('recorded_at', { ascending: false })
+    .limit(100)
+  if (!data) return []
+  const seen = new Set<string>()
+  return data.filter(r => {
+    if (seen.has(r.attribute)) return false
+    seen.add(r.attribute)
+    return true
+  })
+}
+
+// ── components ───────────────────────────────────────────────────────────────
+
+function CurrentReadingCard({ reading }: { reading: Reading }) {
+  const age = Math.round((Date.now() - new Date(reading.recorded_at).getTime()) / 60000)
+  return (
+    <div className="reading-card">
+      <div className="reading-attribute">{reading.attribute}</div>
+      <div className="reading-value">
+        {reading.value}
+        <span className="reading-unit">{reading.unit ?? ''}</span>
+      </div>
+      <div className="reading-age">{age}m ago</div>
+    </div>
+  )
+}
+
+function VpdReferenceCard() {
+  const zones: Array<{ zone: keyof typeof VPD_ZONE_COLORS; range: string; note: string }> = [
+    { zone: 'danger-low',   range: '< 0.4 kPa',     note: 'Overwatering risk, slow growth' },
+    { zone: 'warning-low',  range: '0.4 – 0.8 kPa', note: 'Low transpiration' },
+    { zone: 'ideal-veg',    range: '0.8 – 1.2 kPa', note: 'Ideal for veg stage' },
+    { zone: 'ideal-flower', range: '1.2 – 1.6 kPa', note: 'Ideal for flower stage' },
+    { zone: 'warning-high', range: '1.6 – 2.0 kPa', note: 'Plant stress beginning' },
+    { zone: 'danger-high',  range: '> 2.0 kPa',     note: 'Severe stress / wilting risk' },
+  ]
+  return (
+    <div className="vpd-reference-card">
+      <h3>VPD Reference</h3>
+      <p className="vpd-subtitle">Vapor Pressure Deficit — the "pull" the air exerts on the plant</p>
+      <table className="vpd-table">
+        <tbody>
+          {zones.map(z => (
+            <tr key={z.zone}>
+              <td>
+                <span className="vpd-swatch" style={{ background: VPD_ZONE_COLORS[z.zone] }} />
+              </td>
+              <td className="vpd-range">{z.range}</td>
+              <td className="vpd-note">{VPD_ZONE_LABELS[z.zone]}</td>
+              <td className="vpd-desc">{z.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── main page ────────────────────────────────────────────────────────────────
+
+export default function GrowDashboard() {
+  const [devices, setDevices] = useState<Device[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
+  const [selectedHours, setSelectedHours] = useState(24)
+  const [readings, setReadings] = useState<Reading[]>([])
+  const [latest, setLatest] = useState<Reading[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Load device list on mount
+  useEffect(() => {
+    fetchDevices().then(devs => {
+      setDevices(devs)
+      if (devs.length > 0) setSelectedDeviceId(devs[0].device_id)
+    })
+  }, [])
+
+  // Load time-series and latest readings when device/range changes
+  useEffect(() => {
+    if (!selectedDeviceId) return
+    setLoading(true)
+    Promise.all([
+      fetchReadings(selectedDeviceId, selectedHours),
+      fetchLatest(selectedDeviceId),
+    ]).then(([ts, lat]) => {
+      setReadings(ts)
+      setLatest(lat)
+    }).finally(() => setLoading(false))
+  }, [selectedDeviceId, selectedHours])
+
+  const chartData = useMemo(() => mergeIntoChartPoints(readings), [readings])
+
+  const tempUnit = latest.find(r => r.attribute === 'temperature')?.unit ?? '°F'
+
+  const currentVpd = useMemo(() => {
+    const t = latest.find(r => r.attribute === 'temperature')
+    const h = latest.find(r => r.attribute === 'humidity')
+    if (!t || !h) return null
+    const tempC = (t.unit ?? '°F').includes('F')
+      ? celsiusFromFahrenheit(t.value)
+      : t.value
+    return computeVpd(tempC, h.value)
+  }, [latest])
+
+  return (
+    <div className="grow-dashboard">
+      <header className="grow-header">
+        <h1>Grow Monitor</h1>
+        {currentVpd !== null && (
+          <div className="grow-vpd-badge" style={{ background: VPD_ZONE_COLORS[vpdZone(currentVpd)] }}>
+            VPD {currentVpd} kPa
+          </div>
+        )}
+      </header>
+
+      {/* Controls */}
+      <div className="grow-controls">
+        <select
+          value={selectedDeviceId}
+          onChange={e => setSelectedDeviceId(e.target.value)}
+          className="grow-select"
+        >
+          {devices.length === 0 && <option value="">No devices yet</option>}
+          {devices.map(d => (
+            <option key={d.device_id} value={d.device_id}>{d.device_name}</option>
+          ))}
+        </select>
+
+        <div className="time-range-picker">
+          {TIME_RANGES.map(r => (
+            <button
+              key={r.label}
+              className={`range-btn${selectedHours === r.hours ? ' active' : ''}`}
+              onClick={() => setSelectedHours(r.hours)}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Current readings */}
+      {latest.length > 0 && (
+        <div className="current-readings">
+          {latest.map(r => <CurrentReadingCard key={r.attribute} reading={r} />)}
+        </div>
+      )}
+
+      {loading && <div className="grow-loading">Loading…</div>}
+
+      {!loading && chartData.length > 0 && (
+        <>
+          {/* Temperature chart */}
+          <div className="chart-section">
+            <h2 className="chart-title">Temperature</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
+                <YAxis domain={['auto', 'auto']} unit={` ${tempUnit}`} stroke="#888" tick={{ fontSize: 11 }} width={56} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v} ${tempUnit}`, 'Temp']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Line type="monotone" dataKey="temperature" stroke="#f97316" dot={false} connectNulls strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Humidity chart */}
+          <div className="chart-section">
+            <h2 className="chart-title">Humidity</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v}%`, 'RH']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Line type="monotone" dataKey="humidity" stroke="#3b82f6" dot={false} connectNulls strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* VPD chart */}
+          <div className="chart-section">
+            <h2 className="chart-title">VPD (kPa)</h2>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 2.5]} unit=" kPa" stroke="#888" tick={{ fontSize: 11 }} width={60} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v} kPa`, 'VPD']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Legend verticalAlign="top" height={28} />
+
+                {/* Zone bands — rendered behind the line */}
+                <ReferenceArea y1={0}   y2={0.4} fill="#ef4444" fillOpacity={0.12} />
+                <ReferenceArea y1={0.4} y2={0.8} fill="#f59e0b" fillOpacity={0.12} />
+                <ReferenceArea y1={0.8} y2={1.2} fill="#22c55e" fillOpacity={0.15} label={{ value: 'Ideal Veg', position: 'insideTopRight', fontSize: 10, fill: '#22c55e' }} />
+                <ReferenceArea y1={1.2} y2={1.6} fill="#84cc16" fillOpacity={0.15} label={{ value: 'Ideal Flower', position: 'insideTopRight', fontSize: 10, fill: '#84cc16' }} />
+                <ReferenceArea y1={1.6} y2={2.0} fill="#f59e0b" fillOpacity={0.12} />
+                <ReferenceArea y1={2.0} y2={2.5} fill="#ef4444" fillOpacity={0.12} />
+
+                <Line type="monotone" dataKey="vpd" name="VPD" stroke="#8b5cf6" dot={false} connectNulls strokeWidth={2.5} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {!loading && chartData.length === 0 && selectedDeviceId && (
+        <div className="grow-empty">No readings found for this device in the selected time range.</div>
+      )}
+
+      <VpdReferenceCard />
+    </div>
+  )
+}
