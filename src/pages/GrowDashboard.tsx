@@ -39,8 +39,8 @@ const BUCKET_MS = 5 * 60 * 1000   // 5-minute buckets for chart
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+function formatTime(ts: unknown): string {
+  return new Date(ts as number).toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function formatShortTime(ts: number): string {
