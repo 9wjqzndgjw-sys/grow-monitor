@@ -274,7 +274,7 @@ export default function GrowDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={['auto', 'auto']} unit={` ${tempUnit}`} stroke="#888" tick={{ fontSize: 11 }} width={56} />
-                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v} ${tempUnit}`, 'Temp']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v} ${tempUnit}`, 'Temp']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
                 <Line type="monotone" dataKey="temperature" stroke="#f97316" dot={false} connectNulls strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -288,7 +288,7 @@ export default function GrowDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
-                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v}%`, 'RH']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v}%`, 'RH']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
                 <Line type="monotone" dataKey="humidity" stroke="#3b82f6" dot={false} connectNulls strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -302,7 +302,7 @@ export default function GrowDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 2.5]} unit=" kPa" stroke="#888" tick={{ fontSize: 11 }} width={60} />
-                <Tooltip labelFormatter={formatTime} formatter={(v: number) => [`${v} kPa`, 'VPD']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v} kPa`, 'VPD']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
                 <Legend verticalAlign="top" height={28} />
 
                 {/* Zone bands — rendered behind the line */}
