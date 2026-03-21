@@ -140,16 +140,25 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
 
 // ── components ───────────────────────────────────────────────────────────────
 
-function CurrentReadingCard({ reading }: { reading: Reading }) {
-  const age = Math.round((Date.now() - new Date(reading.recorded_at).getTime()) / 60000)
+function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
+  label: string
+  value: string | null
+  unit: string
+  sub: string
+  isAvg?: boolean
+  accentColor?: string
+}) {
   return (
-    <div className="reading-card">
-      <div className="reading-attribute">{reading.attribute}</div>
-      <div className="reading-value">
-        {reading.value}
-        <span className="reading-unit">{reading.unit ?? ''}</span>
+    <div
+      className={`stat-card${isAvg ? ' stat-avg' : ' stat-current'}`}
+      style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 3 } : undefined}
+    >
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">
+        {value ?? '—'}
+        {value !== null && <span className="stat-unit">{unit}</span>}
       </div>
-      <div className="reading-age">{age}m ago</div>
+      <div className="stat-sub">{sub}</div>
     </div>
   )
 }
@@ -233,6 +242,26 @@ export default function GrowDashboard() {
     return computeVpd(tempC, h.value)
   }, [latest])
 
+  const avgStats = useMemo(() => {
+    const avg = (vals: (number | null)[]) => {
+      const nums = vals.filter((v): v is number => v !== null)
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
+    }
+    return {
+      temp: avg(chartData.map(p => p.temperature)),
+      humidity: avg(chartData.map(p => p.humidity)),
+      vpd: avg(chartData.map(p => p.vpd)),
+    }
+  }, [chartData])
+
+  const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
+  const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
+  const currentAge = latestTemp
+    ? Math.round((Date.now() - new Date(latestTemp.recorded_at).getTime()) / 60000)
+    : null
+  const ageSub = currentAge !== null ? `${currentAge}m ago` : '—'
+  const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
+
   return (
     <div className="grow-dashboard">
       <header className="grow-header">
@@ -270,10 +299,50 @@ export default function GrowDashboard() {
         </div>
       </div>
 
-      {/* Current readings */}
-      {latest.length > 0 && (
-        <div className="current-readings">
-          {latest.map(r => <CurrentReadingCard key={r.attribute} reading={r} />)}
+      {/* 3×2 stats grid */}
+      {!loading && (latest.length > 0 || chartData.length > 0) && (
+        <div className="stats-grid">
+          <StatCard
+            isAvg
+            label="Avg Temp"
+            value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
+            unit={` ${tempUnit}`}
+            sub={`${rangeLabel} avg`}
+          />
+          <StatCard
+            isAvg
+            label="Avg Humidity"
+            value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
+            unit="%"
+            sub={`${rangeLabel} avg`}
+          />
+          <StatCard
+            isAvg
+            label="Avg VPD"
+            value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
+            unit=" kPa"
+            sub={`${rangeLabel} avg`}
+            accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
+          />
+          <StatCard
+            label="Temperature"
+            value={latestTemp !== null ? String(latestTemp.value) : null}
+            unit={` ${tempUnit}`}
+            sub={ageSub}
+          />
+          <StatCard
+            label="Humidity"
+            value={latestHumidity !== null ? String(latestHumidity.value) : null}
+            unit="%"
+            sub={ageSub}
+          />
+          <StatCard
+            label="VPD"
+            value={currentVpd !== null ? currentVpd.toFixed(2) : null}
+            unit=" kPa"
+            sub={ageSub}
+            accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
+          />
         </div>
       )}
 
