@@ -87,9 +87,8 @@ function mergeIntoChartPoints(readings: Reading[]): ChartPoint[] {
 
     return {
       ts,
-      // Use null (not undefined) so Recharts connectNulls works correctly
-      temperature: b.temp?.value ?? null,
-      humidity: b.humidity ?? null,
+      temperature: effectiveTemp?.value ?? null,
+      humidity: effectiveHumidity ?? null,
       vpd,
     }
   })
