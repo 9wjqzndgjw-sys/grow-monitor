@@ -353,7 +353,7 @@ export default function GrowDashboard() {
           {/* Temperature chart */}
           <div className="chart-section">
             <h2 className="chart-title">Temperature</h2>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="99%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
@@ -367,7 +367,7 @@ export default function GrowDashboard() {
           {/* Humidity chart */}
           <div className="chart-section">
             <h2 className="chart-title">Humidity</h2>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="99%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
@@ -381,7 +381,7 @@ export default function GrowDashboard() {
           {/* VPD chart */}
           <div className="chart-section">
             <h2 className="chart-title">VPD (kPa)</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="99%" height={260}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
