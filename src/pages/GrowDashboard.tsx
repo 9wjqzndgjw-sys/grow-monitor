@@ -353,7 +353,7 @@ export default function GrowDashboard() {
           <div className="chart-section">
             <h2 className="chart-title">Temperature</h2>
             <ResponsiveContainer width="99%" height={220}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={['auto', 'auto']} unit={` ${tempUnit}`} stroke="#888" tick={{ fontSize: 11 }} width={56} />
@@ -367,7 +367,7 @@ export default function GrowDashboard() {
           <div className="chart-section">
             <h2 className="chart-title">Humidity</h2>
             <ResponsiveContainer width="99%" height={220}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[45, 100]} ticks={[45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
@@ -381,7 +381,7 @@ export default function GrowDashboard() {
           <div className="chart-section">
             <h2 className="chart-title">VPD (kPa)</h2>
             <ResponsiveContainer width="99%" height={260}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 2.5]} unit=" kPa" stroke="#888" tick={{ fontSize: 11 }} width={60} />
