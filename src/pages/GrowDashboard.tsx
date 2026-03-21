@@ -28,14 +28,12 @@ interface ChartPoint {
 // ── constants ────────────────────────────────────────────────────────────────
 
 const TIME_RANGES = [
-  { label: '6h',  hours: 6 },
-  { label: '12h', hours: 12 },
-  { label: '24h', hours: 24 },
-  { label: '7d',  hours: 168 },
-  { label: '30d', hours: 720 },
+  { label: '6h',  hours: 6,   bucketMs: 2 * 60 * 1000 },
+  { label: '12h', hours: 12,  bucketMs: 2 * 60 * 1000 },
+  { label: '24h', hours: 24,  bucketMs: 5 * 60 * 1000 },
+  { label: '7d',  hours: 168, bucketMs: 5 * 60 * 1000 },
+  { label: '30d', hours: 720, bucketMs: 5 * 60 * 1000 },
 ]
-
-const BUCKET_MS = 5 * 60 * 1000   // 5-minute buckets for chart
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,12 +45,12 @@ function formatShortTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function mergeIntoChartPoints(readings: Reading[]): ChartPoint[] {
+function mergeIntoChartPoints(readings: Reading[], bucketMs: number): ChartPoint[] {
   const buckets = new Map<number, { temp?: { value: number; unit: string }; humidity?: number }>()
 
   for (const r of readings) {
     const ts = new Date(r.recorded_at).getTime()
-    const bucket = Math.round(ts / BUCKET_MS) * BUCKET_MS
+    const bucket = Math.round(ts / bucketMs) * bucketMs
     if (!buckets.has(bucket)) buckets.set(bucket, {})
     const b = buckets.get(bucket)!
 
@@ -140,16 +138,25 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
 
 // ── components ───────────────────────────────────────────────────────────────
 
-function CurrentReadingCard({ reading }: { reading: Reading }) {
-  const age = Math.round((Date.now() - new Date(reading.recorded_at).getTime()) / 60000)
+function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
+  label: string
+  value: string | null
+  unit: string
+  sub: string
+  isAvg?: boolean
+  accentColor?: string
+}) {
   return (
-    <div className="reading-card">
-      <div className="reading-attribute">{reading.attribute}</div>
-      <div className="reading-value">
-        {reading.value}
-        <span className="reading-unit">{reading.unit ?? ''}</span>
+    <div
+      className={`stat-card${isAvg ? ' stat-avg' : ' stat-current'}`}
+      style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 3 } : undefined}
+    >
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">
+        {value ?? '—'}
+        {value !== null && <span className="stat-unit">{unit}</span>}
       </div>
-      <div className="reading-age">{age}m ago</div>
+      <div className="stat-sub">{sub}</div>
     </div>
   )
 }
@@ -199,7 +206,10 @@ export default function GrowDashboard() {
   useEffect(() => {
     fetchDevices().then(devs => {
       setDevices(devs)
-      if (devs.length > 0) setSelectedDeviceId(devs[0].device_id)
+      if (devs.length > 0) {
+        const preferred = devs.find(d => d.device_name === 'Sonoff Hygrometer 2')
+        setSelectedDeviceId((preferred ?? devs[0]).device_id)
+      }
     })
   }, [])
 
@@ -216,7 +226,8 @@ export default function GrowDashboard() {
     }).finally(() => setLoading(false))
   }, [selectedDeviceId, selectedHours])
 
-  const chartData = useMemo(() => mergeIntoChartPoints(readings), [readings])
+  const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
+  const chartData = useMemo(() => mergeIntoChartPoints(readings, bucketMs), [readings, bucketMs])
 
   const tempUnit = latest.find(r => r.attribute === 'temperature')?.unit ?? '°F'
 
@@ -229,6 +240,26 @@ export default function GrowDashboard() {
       : t.value
     return computeVpd(tempC, h.value)
   }, [latest])
+
+  const avgStats = useMemo(() => {
+    const avg = (vals: (number | null)[]) => {
+      const nums = vals.filter((v): v is number => v !== null)
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
+    }
+    return {
+      temp: avg(chartData.map(p => p.temperature)),
+      humidity: avg(chartData.map(p => p.humidity)),
+      vpd: avg(chartData.map(p => p.vpd)),
+    }
+  }, [chartData])
+
+  const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
+  const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
+  const currentAge = latestTemp
+    ? Math.round((Date.now() - new Date(latestTemp.recorded_at).getTime()) / 60000)
+    : null
+  const ageSub = currentAge !== null ? `${currentAge}m ago` : '—'
+  const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
   return (
     <div className="grow-dashboard">
@@ -267,10 +298,50 @@ export default function GrowDashboard() {
         </div>
       </div>
 
-      {/* Current readings */}
-      {latest.length > 0 && (
-        <div className="current-readings">
-          {latest.map(r => <CurrentReadingCard key={r.attribute} reading={r} />)}
+      {/* 3×2 stats grid */}
+      {!loading && (latest.length > 0 || chartData.length > 0) && (
+        <div className="stats-grid">
+          <StatCard
+            isAvg
+            label="Avg Temp"
+            value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
+            unit={` ${tempUnit}`}
+            sub={`${rangeLabel} avg`}
+          />
+          <StatCard
+            isAvg
+            label="Avg Humidity"
+            value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
+            unit="%"
+            sub={`${rangeLabel} avg`}
+          />
+          <StatCard
+            isAvg
+            label="Avg VPD"
+            value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
+            unit=" kPa"
+            sub={`${rangeLabel} avg`}
+            accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
+          />
+          <StatCard
+            label="Temperature"
+            value={latestTemp !== null ? String(latestTemp.value) : null}
+            unit={` ${tempUnit}`}
+            sub={ageSub}
+          />
+          <StatCard
+            label="Humidity"
+            value={latestHumidity !== null ? String(latestHumidity.value) : null}
+            unit="%"
+            sub={ageSub}
+          />
+          <StatCard
+            label="VPD"
+            value={currentVpd !== null ? currentVpd.toFixed(2) : null}
+            unit=" kPa"
+            sub={ageSub}
+            accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
+          />
         </div>
       )}
 
@@ -281,7 +352,7 @@ export default function GrowDashboard() {
           {/* Temperature chart */}
           <div className="chart-section">
             <h2 className="chart-title">Temperature</h2>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="99%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
@@ -295,7 +366,7 @@ export default function GrowDashboard() {
           {/* Humidity chart */}
           <div className="chart-section">
             <h2 className="chart-title">Humidity</h2>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="99%" height={220}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
@@ -309,7 +380,7 @@ export default function GrowDashboard() {
           {/* VPD chart */}
           <div className="chart-section">
             <h2 className="chart-title">VPD (kPa)</h2>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="99%" height={260}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />

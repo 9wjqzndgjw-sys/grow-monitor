@@ -56,6 +56,7 @@
 
 .time-range-picker {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -82,48 +83,75 @@
   font-weight: 600;
 }
 
-/* current readings */
-.current-readings {
-  display: flex;
-  flex-wrap: wrap;
+/* stats grid (3×2: top row = period averages, bottom row = current) */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 28px;
 }
 
-.reading-card {
+.stat-card {
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 10px;
-  padding: 14px 20px;
-  min-width: 120px;
+  padding: 14px 12px;
   text-align: center;
+  border-top-width: 1px;
 }
 
-.reading-attribute {
-  font-size: 0.75rem;
+.stat-avg {
+  opacity: 0.75;
+}
+
+.stat-current {
+  border-color: #333;
+  background: #1e1e1e;
+}
+
+.stat-label {
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #888;
-  margin-bottom: 4px;
+  color: #666;
+  margin-bottom: 6px;
 }
 
-.reading-value {
-  font-size: 1.8rem;
+.stat-current .stat-label {
+  color: #888;
+}
+
+.stat-value {
+  font-size: 1.55rem;
   font-weight: 700;
   line-height: 1.1;
+  color: #bbb;
 }
 
-.reading-unit {
-  font-size: 1rem;
+.stat-current .stat-value {
+  font-size: 1.8rem;
+  color: #e5e5e5;
+}
+
+.stat-unit {
+  font-size: 0.85rem;
   font-weight: 400;
-  color: #aaa;
+  color: #777;
   margin-left: 2px;
 }
 
-.reading-age {
-  font-size: 0.72rem;
+.stat-current .stat-unit {
+  color: #aaa;
+}
+
+.stat-sub {
+  font-size: 0.68rem;
+  color: #444;
+  margin-top: 5px;
+}
+
+.stat-current .stat-sub {
   color: #555;
-  margin-top: 4px;
 }
 
 /* charts */
