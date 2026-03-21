@@ -28,14 +28,12 @@ interface ChartPoint {
 // ── constants ────────────────────────────────────────────────────────────────
 
 const TIME_RANGES = [
-  { label: '6h',  hours: 6 },
-  { label: '12h', hours: 12 },
-  { label: '24h', hours: 24 },
-  { label: '7d',  hours: 168 },
-  { label: '30d', hours: 720 },
+  { label: '6h',  hours: 6,   bucketMs: 2 * 60 * 1000 },
+  { label: '12h', hours: 12,  bucketMs: 2 * 60 * 1000 },
+  { label: '24h', hours: 24,  bucketMs: 5 * 60 * 1000 },
+  { label: '7d',  hours: 168, bucketMs: 5 * 60 * 1000 },
+  { label: '30d', hours: 720, bucketMs: 5 * 60 * 1000 },
 ]
-
-const BUCKET_MS = 5 * 60 * 1000   // 5-minute buckets for chart
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,12 +45,12 @@ function formatShortTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function mergeIntoChartPoints(readings: Reading[]): ChartPoint[] {
+function mergeIntoChartPoints(readings: Reading[], bucketMs: number): ChartPoint[] {
   const buckets = new Map<number, { temp?: { value: number; unit: string }; humidity?: number }>()
 
   for (const r of readings) {
     const ts = new Date(r.recorded_at).getTime()
-    const bucket = Math.round(ts / BUCKET_MS) * BUCKET_MS
+    const bucket = Math.round(ts / bucketMs) * bucketMs
     if (!buckets.has(bucket)) buckets.set(bucket, {})
     const b = buckets.get(bucket)!
 
@@ -228,7 +226,8 @@ export default function GrowDashboard() {
     }).finally(() => setLoading(false))
   }, [selectedDeviceId, selectedHours])
 
-  const chartData = useMemo(() => mergeIntoChartPoints(readings), [readings])
+  const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
+  const chartData = useMemo(() => mergeIntoChartPoints(readings, bucketMs), [readings, bucketMs])
 
   const tempUnit = latest.find(r => r.attribute === 'temperature')?.unit ?? '°F'
 
