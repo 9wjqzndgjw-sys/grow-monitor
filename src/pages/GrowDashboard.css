@@ -202,6 +202,7 @@
 
 .vpd-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -226,12 +227,12 @@
   color: #ccc;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  min-width: 110px;
+  width: 30%;
 }
 
 .vpd-note {
   color: #aaa;
-  min-width: 140px;
+  width: 35%;
 }
 
 .vpd-desc {
