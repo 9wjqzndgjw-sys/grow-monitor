@@ -287,7 +287,7 @@ export default function GrowDashboard() {
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
+                <YAxis domain={[45, 100]} ticks={[45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
                 <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v}%`, 'RH']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
                 <Line type="monotone" dataKey="humidity" stroke="#3b82f6" dot={false} connectNulls strokeWidth={2} />
               </LineChart>
