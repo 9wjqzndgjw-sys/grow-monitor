@@ -199,7 +199,10 @@ export default function GrowDashboard() {
   useEffect(() => {
     fetchDevices().then(devs => {
       setDevices(devs)
-      if (devs.length > 0) setSelectedDeviceId(devs[0].device_id)
+      if (devs.length > 0) {
+        const preferred = devs.find(d => d.device_name === 'Sonoff Hygrometer 2')
+        setSelectedDeviceId((preferred ?? devs[0]).device_id)
+      }
     })
   }, [])
 
