@@ -20,9 +20,9 @@ interface Reading {
 
 interface ChartPoint {
   ts: number
-  temperature?: number
-  humidity?: number
-  vpd?: number
+  temperature: number | null
+  humidity: number | null
+  vpd: number | null
 }
 
 // ── constants ────────────────────────────────────────────────────────────────
@@ -57,29 +57,41 @@ function mergeIntoChartPoints(readings: Reading[]): ChartPoint[] {
     const b = buckets.get(bucket)!
 
     if (r.attribute === 'temperature') {
-      b.temp = { value: r.value, unit: r.unit ?? '°F' }
+      b.temp = { value: Number(r.value), unit: r.unit ?? '°F' }
     } else if (r.attribute === 'humidity') {
-      b.humidity = r.value
+      b.humidity = Number(r.value)
     }
   }
 
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([ts, b]) => {
-      let vpd: number | undefined
-      if (b.temp !== undefined && b.humidity !== undefined) {
-        const tempC = b.temp.unit.includes('F')
-          ? celsiusFromFahrenheit(b.temp.value)
-          : b.temp.value
-        vpd = computeVpd(tempC, b.humidity)
-      }
-      return {
-        ts,
-        temperature: b.temp?.value,
-        humidity: b.humidity,
-        vpd,
-      }
-    })
+  const sorted = Array.from(buckets.entries()).sort(([a], [b]) => a - b)
+
+  // Forward-fill last known temp/humidity so VPD is computed even when
+  // temperature and humidity readings land in different 5-minute buckets.
+  let lastTemp: { value: number; unit: string } | undefined
+  let lastHumidity: number | undefined
+
+  return sorted.map(([ts, b]) => {
+    if (b.temp !== undefined) lastTemp = b.temp
+    if (b.humidity !== undefined) lastHumidity = b.humidity
+
+    const effectiveTemp = b.temp ?? lastTemp
+    const effectiveHumidity = b.humidity ?? lastHumidity
+
+    let vpd: number | null = null
+    if (effectiveTemp !== undefined && effectiveHumidity !== undefined) {
+      const tempC = effectiveTemp.unit.includes('F')
+        ? celsiusFromFahrenheit(effectiveTemp.value)
+        : effectiveTemp.value
+      vpd = computeVpd(tempC, effectiveHumidity)
+    }
+
+    return {
+      ts,
+      temperature: effectiveTemp?.value ?? null,
+      humidity: effectiveHumidity ?? null,
+      vpd,
+    }
+  })
 }
 
 // ── data fetching ────────────────────────────────────────────────────────────
