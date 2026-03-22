@@ -264,9 +264,9 @@ export default function GrowDashboard() {
     return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
   }
   function ageSubFor(r: typeof latestTemp) {
-    if (!r) return 'no reading'
+    if (!r) return '—'
     const mins = Math.round((Date.now() - new Date(r.recorded_at).getTime()) / 60000)
-    return `last reading ${formatAge(mins)}`
+    return formatAge(mins)
   }
   const tempAgeSub = ageSubFor(latestTemp)
   const humidityAgeSub = ageSubFor(latestHumidity)
