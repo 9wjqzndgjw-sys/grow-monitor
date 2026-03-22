@@ -256,9 +256,6 @@ export default function GrowDashboard() {
 
   const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
   const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
-  const currentAge = latestTemp
-    ? Math.round((Date.now() - new Date(latestTemp.recorded_at).getTime()) / 60000)
-    : null
   function formatAge(mins: number): string {
     if (mins < 1) return 'just now'
     if (mins < 60) return `${mins}m ago`
@@ -266,7 +263,13 @@ export default function GrowDashboard() {
     const m = mins % 60
     return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
   }
-  const ageSub = currentAge !== null ? `last reading ${formatAge(currentAge)}` : 'no reading'
+  function ageSubFor(r: typeof latestTemp) {
+    if (!r) return '—'
+    const mins = Math.round((Date.now() - new Date(r.recorded_at).getTime()) / 60000)
+    return formatAge(mins)
+  }
+  const tempAgeSub = ageSubFor(latestTemp)
+  const humidityAgeSub = ageSubFor(latestHumidity)
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
   return (
@@ -343,19 +346,19 @@ export default function GrowDashboard() {
             <StatCard
               value={latestTemp !== null ? String(latestTemp.value) : null}
               unit={` ${tempUnit}`}
-              sub={ageSub}
+              sub={tempAgeSub}
             />
             <StatCard
               value={latestHumidity !== null ? String(latestHumidity.value) : null}
               unit="%"
-              sub={ageSub}
+              sub={humidityAgeSub}
             />
             <StatCard
               value={currentVpd !== null ? currentVpd.toFixed(2) : null}
-            unit=" kPa"
-            sub={ageSub}
-            accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
-          />
+              unit=" kPa"
+              sub={tempAgeSub}
+              accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
+            />
           </div>
         </>
       )}
