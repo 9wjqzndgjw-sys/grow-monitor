@@ -138,11 +138,10 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
 
 // ── components ───────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
-  label: string
+function StatCard({ value, unit, sub, isAvg, accentColor }: {
   value: string | null
   unit: string
-  sub: string
+  sub?: string
   isAvg?: boolean
   accentColor?: string
 }) {
@@ -151,12 +150,11 @@ function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
       className={`stat-card${isAvg ? ' stat-avg' : ' stat-current'}`}
       style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 3 } : undefined}
     >
-      <div className="stat-label">{label}</div>
       <div className="stat-value">
         {value ?? '—'}
         {value !== null && <span className="stat-unit">{unit}</span>}
       </div>
-      <div className="stat-sub">{sub}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
     </div>
   )
 }
@@ -317,51 +315,49 @@ export default function GrowDashboard() {
         </button>
       </div>
 
-      {/* 3×2 stats grid */}
+      {/* Stats rows */}
       {!loading && (latest.length > 0 || chartData.length > 0) && (
-        <div className="stats-grid">
-          <StatCard
-            isAvg
-            label="Avg Temp"
-            value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
-            unit={` ${tempUnit}`}
-            sub={`${rangeLabel} avg`}
-          />
-          <StatCard
-            isAvg
-            label="Avg Humidity"
-            value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
-            unit="%"
-            sub={`${rangeLabel} avg`}
-          />
-          <StatCard
-            isAvg
-            label="Avg VPD"
-            value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
-            unit=" kPa"
-            sub={`${rangeLabel} avg`}
-            accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
-          />
-          <StatCard
-            label="Temperature"
-            value={latestTemp !== null ? String(latestTemp.value) : null}
-            unit={` ${tempUnit}`}
-            sub={ageSub}
-          />
-          <StatCard
-            label="Humidity"
-            value={latestHumidity !== null ? String(latestHumidity.value) : null}
-            unit="%"
-            sub={ageSub}
-          />
-          <StatCard
-            label="VPD"
-            value={currentVpd !== null ? currentVpd.toFixed(2) : null}
+        <>
+          <div className="stats-row-label">Average over {rangeLabel}</div>
+          <div className="stats-grid">
+            <StatCard
+              isAvg
+              value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
+              unit={` ${tempUnit}`}
+            />
+            <StatCard
+              isAvg
+              value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
+              unit="%"
+            />
+            <StatCard
+              isAvg
+              value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
+              unit=" kPa"
+              accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
+            />
+          </div>
+
+          <div className="stats-row-label">Current</div>
+          <div className="stats-grid">
+            <StatCard
+              value={latestTemp !== null ? String(latestTemp.value) : null}
+              unit={` ${tempUnit}`}
+              sub={ageSub}
+            />
+            <StatCard
+              value={latestHumidity !== null ? String(latestHumidity.value) : null}
+              unit="%"
+              sub={ageSub}
+            />
+            <StatCard
+              value={currentVpd !== null ? currentVpd.toFixed(2) : null}
             unit=" kPa"
             sub={ageSub}
             accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
           />
-        </div>
+          </div>
+        </>
       )}
 
       {loading && <div className="grow-loading">Loading…</div>}
