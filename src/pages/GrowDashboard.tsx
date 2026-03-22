@@ -256,10 +256,18 @@ export default function GrowDashboard() {
     }
   }, [chartData])
 
+  const [now, setNow] = useState(() => Date.now())
+
+  // Tick every 30s so the "X min ago" label stays current
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
   const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
   const currentAge = latestTemp
-    ? Math.round((Date.now() - new Date(latestTemp.recorded_at).getTime()) / 60000)
+    ? Math.round((now - new Date(latestTemp.recorded_at).getTime()) / 60000)
     : null
   const ageSub = currentAge !== null ? `${currentAge}m ago` : '—'
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
