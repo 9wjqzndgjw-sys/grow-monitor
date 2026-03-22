@@ -162,13 +162,13 @@ function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
 }
 
 function VpdReferenceCard() {
-  const zones: Array<{ zone: keyof typeof VPD_ZONE_COLORS; range: string; note: string }> = [
-    { zone: 'danger-low',   range: '< 0.4 kPa',     note: 'Overwatering risk, slow growth' },
-    { zone: 'warning-low',  range: '0.4 – 0.8 kPa', note: 'Low transpiration' },
-    { zone: 'ideal-veg',    range: '0.8 – 1.2 kPa', note: 'Ideal for veg stage' },
-    { zone: 'ideal-flower', range: '1.2 – 1.6 kPa', note: 'Ideal for flower stage' },
-    { zone: 'warning-high', range: '1.6 – 2.0 kPa', note: 'Plant stress beginning' },
-    { zone: 'danger-high',  range: '> 2.0 kPa',     note: 'Severe stress / wilting risk' },
+  const zones: Array<{ zone: keyof typeof VPD_ZONE_COLORS; range: string; desc: string }> = [
+    { zone: 'danger-low',   range: '< 0.4 kPa',     desc: 'Overwatering risk, slow growth' },
+    { zone: 'warning-low',  range: '0.4 – 0.8 kPa', desc: 'Low transpiration' },
+    { zone: 'ideal-veg',    range: '0.8 – 1.2 kPa', desc: 'Ideal for veg stage' },
+    { zone: 'ideal-flower', range: '1.2 – 1.6 kPa', desc: 'Ideal for flower stage' },
+    { zone: 'warning-high', range: '1.6 – 2.0 kPa', desc: 'Plant stress beginning' },
+    { zone: 'danger-high',  range: '> 2.0 kPa',     desc: 'Severe stress / wilting risk' },
   ]
   return (
     <div className="vpd-reference-card">
@@ -178,12 +178,14 @@ function VpdReferenceCard() {
         <tbody>
           {zones.map(z => (
             <tr key={z.zone}>
-              <td>
+              <td className="vpd-swatch-cell">
                 <span className="vpd-swatch" style={{ background: VPD_ZONE_COLORS[z.zone] }} />
               </td>
               <td className="vpd-range">{z.range}</td>
-              <td className="vpd-note">{VPD_ZONE_LABELS[z.zone]}</td>
-              <td className="vpd-desc">{z.note}</td>
+              <td className="vpd-note">
+                {VPD_ZONE_LABELS[z.zone]}
+                <div className="vpd-desc">{z.desc}</div>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -201,6 +203,7 @@ export default function GrowDashboard() {
   const [readings, setReadings] = useState<Reading[]>([])
   const [latest, setLatest] = useState<Reading[]>([])
   const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Load device list on mount
   useEffect(() => {
@@ -224,7 +227,7 @@ export default function GrowDashboard() {
       setReadings(ts)
       setLatest(lat)
     }).finally(() => setLoading(false))
-  }, [selectedDeviceId, selectedHours])
+  }, [selectedDeviceId, selectedHours, refreshKey])
 
   const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
   const chartData = useMemo(() => mergeIntoChartPoints(readings, bucketMs), [readings, bucketMs])
@@ -296,6 +299,15 @@ export default function GrowDashboard() {
             </button>
           ))}
         </div>
+
+        <button
+          className="refresh-btn"
+          onClick={() => setRefreshKey(k => k + 1)}
+          disabled={loading}
+          title="Refresh data"
+        >
+          ↻
+        </button>
       </div>
 
       {/* 3×2 stats grid */}

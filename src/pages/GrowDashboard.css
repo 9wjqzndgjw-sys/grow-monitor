@@ -216,6 +216,11 @@
   vertical-align: middle;
 }
 
+.vpd-swatch-cell {
+  width: 24px;
+  padding-right: 4px;
+}
+
 .vpd-swatch {
   display: inline-block;
   width: 12px;
@@ -227,15 +232,38 @@
   color: #ccc;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  width: 30%;
+  width: 38%;
 }
 
 .vpd-note {
   color: #aaa;
-  width: 35%;
 }
 
 .vpd-desc {
-  color: #666;
-  font-size: 0.8rem;
+  color: #555;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.refresh-btn {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  margin-left: auto;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
