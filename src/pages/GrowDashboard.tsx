@@ -197,7 +197,7 @@ function VpdReferenceCard() {
 export default function GrowDashboard() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
-  const [selectedHours, setSelectedHours] = useState(24)
+  const [selectedHours, setSelectedHours] = useState(6)
   const [readings, setReadings] = useState<Reading[]>([])
   const [latest, setLatest] = useState<Reading[]>([])
   const [loading, setLoading] = useState(false)
@@ -272,6 +272,24 @@ export default function GrowDashboard() {
   const humidityAgeSub = ageSubFor(latestHumidity)
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
+  function exportCsv() {
+    const rows = readings
+      .slice()
+      .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+    const header = 'timestamp,attribute,value,unit'
+    const lines = rows.map(r =>
+      `${r.recorded_at},${r.attribute},${r.value},${r.unit ?? ''}`
+    )
+    const csv = [header, ...lines].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `grow-readings-${rangeLabel}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="grow-dashboard">
       <header className="grow-header">
@@ -315,6 +333,15 @@ export default function GrowDashboard() {
           title="Refresh data"
         >
           ↻
+        </button>
+
+        <button
+          className="export-btn"
+          onClick={exportCsv}
+          disabled={loading || readings.length === 0}
+          title="Export CSV"
+        >
+          Export
         </button>
       </div>
 
