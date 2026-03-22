@@ -104,7 +104,7 @@
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 10px;
-  padding: 14px 12px;
+  padding: 10px 12px;
   text-align: center;
   border-top-width: 1px;
 }
@@ -120,14 +120,15 @@
 
 
 .stat-value {
-  font-size: 1.55rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.1;
   color: #bbb;
+  white-space: nowrap;
 }
 
 .stat-current .stat-value {
-  font-size: 1.8rem;
+  font-size: 1.45rem;
   color: #e5e5e5;
 }
 
