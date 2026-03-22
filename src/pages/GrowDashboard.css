@@ -83,12 +83,21 @@
   font-weight: 600;
 }
 
-/* stats grid (3×2: top row = period averages, bottom row = current) */
+/* stats section banners + grid */
+.stats-row-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .stat-card {
@@ -109,17 +118,6 @@
   background: #1e1e1e;
 }
 
-.stat-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #666;
-  margin-bottom: 6px;
-}
-
-.stat-current .stat-label {
-  color: #888;
-}
 
 .stat-value {
   font-size: 1.55rem;
