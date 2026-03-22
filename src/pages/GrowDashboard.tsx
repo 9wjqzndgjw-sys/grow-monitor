@@ -269,7 +269,14 @@ export default function GrowDashboard() {
   const currentAge = latestTemp
     ? Math.round((now - new Date(latestTemp.recorded_at).getTime()) / 60000)
     : null
-  const ageSub = currentAge !== null ? `${currentAge}m ago` : '—'
+  function formatAge(mins: number): string {
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
+  }
+  const ageSub = currentAge !== null ? `last reading ${formatAge(currentAge)}` : 'no reading'
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
   return (
