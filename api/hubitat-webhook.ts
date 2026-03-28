@@ -25,7 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { deviceId, displayName, name, value, unit } = req.body ?? {}
 
+    console.log('[hubitat-webhook] body:', JSON.stringify(req.body))
+
     if (!deviceId || !name || value === undefined || value === null) {
+      console.log('[hubitat-webhook] 400 missing fields:', { deviceId, name, value })
       return res.status(400).json({ error: 'Missing required fields: deviceId, name, value' })
     }
 
