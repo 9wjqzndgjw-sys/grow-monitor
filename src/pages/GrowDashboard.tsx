@@ -136,13 +136,35 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
   })
 }
 
+async function fetchDimmerReadings(hours: number): Promise<Reading[]> {
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString()
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', 'Dimmer')
+    .eq('attribute', 'dimmer')
+    .gte('recorded_at', since)
+    .order('recorded_at', { ascending: true })
+  return data ?? []
+}
+
+async function fetchLatestDimmer(): Promise<Reading | null> {
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', 'Dimmer')
+    .eq('attribute', 'dimmer')
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+  return data?.[0] ?? null
+}
+
 // ── components ───────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
-  label: string
+function StatCard({ value, unit, sub, isAvg, accentColor }: {
   value: string | null
   unit: string
-  sub: string
+  sub?: string
   isAvg?: boolean
   accentColor?: string
 }) {
@@ -151,24 +173,23 @@ function StatCard({ label, value, unit, sub, isAvg, accentColor }: {
       className={`stat-card${isAvg ? ' stat-avg' : ' stat-current'}`}
       style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 3 } : undefined}
     >
-      <div className="stat-label">{label}</div>
       <div className="stat-value">
         {value ?? '—'}
         {value !== null && <span className="stat-unit">{unit}</span>}
       </div>
-      <div className="stat-sub">{sub}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
     </div>
   )
 }
 
 function VpdReferenceCard() {
-  const zones: Array<{ zone: keyof typeof VPD_ZONE_COLORS; range: string; note: string }> = [
-    { zone: 'danger-low',   range: '< 0.4 kPa',     note: 'Overwatering risk, slow growth' },
-    { zone: 'warning-low',  range: '0.4 – 0.8 kPa', note: 'Low transpiration' },
-    { zone: 'ideal-veg',    range: '0.8 – 1.2 kPa', note: 'Ideal for veg stage' },
-    { zone: 'ideal-flower', range: '1.2 – 1.6 kPa', note: 'Ideal for flower stage' },
-    { zone: 'warning-high', range: '1.6 – 2.0 kPa', note: 'Plant stress beginning' },
-    { zone: 'danger-high',  range: '> 2.0 kPa',     note: 'Severe stress / wilting risk' },
+  const zones: Array<{ zone: keyof typeof VPD_ZONE_COLORS; range: string; desc: string }> = [
+    { zone: 'danger-low',   range: '< 0.4 kPa',     desc: 'Overwatering risk, slow growth' },
+    { zone: 'warning-low',  range: '0.4 – 0.8 kPa', desc: 'Low transpiration' },
+    { zone: 'ideal-veg',    range: '0.8 – 1.2 kPa', desc: 'Ideal for veg stage' },
+    { zone: 'ideal-flower', range: '1.2 – 1.6 kPa', desc: 'Ideal for flower stage' },
+    { zone: 'warning-high', range: '1.6 – 2.0 kPa', desc: 'Plant stress beginning' },
+    { zone: 'danger-high',  range: '> 2.0 kPa',     desc: 'Severe stress / wilting risk' },
   ]
   return (
     <div className="vpd-reference-card">
@@ -178,12 +199,14 @@ function VpdReferenceCard() {
         <tbody>
           {zones.map(z => (
             <tr key={z.zone}>
-              <td>
+              <td className="vpd-swatch-cell">
                 <span className="vpd-swatch" style={{ background: VPD_ZONE_COLORS[z.zone] }} />
               </td>
               <td className="vpd-range">{z.range}</td>
-              <td className="vpd-note">{VPD_ZONE_LABELS[z.zone]}</td>
-              <td className="vpd-desc">{z.note}</td>
+              <td className="vpd-note">
+                {VPD_ZONE_LABELS[z.zone]}
+                <div className="vpd-desc">{z.desc}</div>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -197,10 +220,13 @@ function VpdReferenceCard() {
 export default function GrowDashboard() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
-  const [selectedHours, setSelectedHours] = useState(24)
+  const [selectedHours, setSelectedHours] = useState(6)
   const [readings, setReadings] = useState<Reading[]>([])
   const [latest, setLatest] = useState<Reading[]>([])
+  const [dimmerReadings, setDimmerReadings] = useState<Reading[]>([])
+  const [latestDimmer, setLatestDimmer] = useState<Reading | null>(null)
   const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Load device list on mount
   useEffect(() => {
@@ -220,14 +246,30 @@ export default function GrowDashboard() {
     Promise.all([
       fetchReadings(selectedDeviceId, selectedHours),
       fetchLatest(selectedDeviceId),
-    ]).then(([ts, lat]) => {
+      fetchDimmerReadings(selectedHours),
+      fetchLatestDimmer(),
+    ]).then(([ts, lat, dimTs, dimLat]) => {
       setReadings(ts)
       setLatest(lat)
+      setDimmerReadings(dimTs)
+      setLatestDimmer(dimLat)
     }).finally(() => setLoading(false))
-  }, [selectedDeviceId, selectedHours])
+  }, [selectedDeviceId, selectedHours, refreshKey])
 
   const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
   const chartData = useMemo(() => mergeIntoChartPoints(readings, bucketMs), [readings, bucketMs])
+
+  const dimmerChartData = useMemo(() => {
+    const buckets = new Map<number, number>()
+    for (const r of dimmerReadings) {
+      const ts = new Date(r.recorded_at).getTime()
+      const bucket = Math.round(ts / bucketMs) * bucketMs
+      buckets.set(bucket, Number(r.value))
+    }
+    return Array.from(buckets.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([ts, level]) => ({ ts, level }))
+  }, [dimmerReadings, bucketMs])
 
   const tempUnit = latest.find(r => r.attribute === 'temperature')?.unit ?? '°F'
 
@@ -250,16 +292,45 @@ export default function GrowDashboard() {
       temp: avg(chartData.map(p => p.temperature)),
       humidity: avg(chartData.map(p => p.humidity)),
       vpd: avg(chartData.map(p => p.vpd)),
+      dimmer: avg(dimmerChartData.map(p => p.level)),
     }
-  }, [chartData])
+  }, [chartData, dimmerChartData])
 
   const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
   const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
-  const currentAge = latestTemp
-    ? Math.round((Date.now() - new Date(latestTemp.recorded_at).getTime()) / 60000)
-    : null
-  const ageSub = currentAge !== null ? `${currentAge}m ago` : '—'
+  function formatAge(mins: number): string {
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
+  }
+  function ageSubFor(r: typeof latestTemp) {
+    if (!r) return '—'
+    const mins = Math.round((Date.now() - new Date(r.recorded_at).getTime()) / 60000)
+    return formatAge(mins)
+  }
+  const tempAgeSub = ageSubFor(latestTemp)
+  const humidityAgeSub = ageSubFor(latestHumidity)
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
+
+  function exportCsv() {
+    const rows = [...readings, ...dimmerReadings]
+      .slice()
+      .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+    const header = 'timestamp,attribute,value,unit'
+    const lines = rows.map(r =>
+      `${r.recorded_at},${r.attribute},${r.value},${r.unit ?? ''}`
+    )
+    const csv = [header, ...lines].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `grow-readings-${rangeLabel}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="grow-dashboard">
@@ -296,53 +367,79 @@ export default function GrowDashboard() {
             </button>
           ))}
         </div>
+
+        <button
+          className="refresh-btn"
+          onClick={() => setRefreshKey(k => k + 1)}
+          disabled={loading}
+          title="Refresh data"
+        >
+          ↻
+        </button>
+
+        <button
+          className="export-btn"
+          onClick={exportCsv}
+          disabled={loading || readings.length === 0}
+          title="Export CSV"
+        >
+          Export
+        </button>
       </div>
 
-      {/* 3×2 stats grid */}
+      {/* Stats rows */}
       {!loading && (latest.length > 0 || chartData.length > 0) && (
-        <div className="stats-grid">
-          <StatCard
-            isAvg
-            label="Avg Temp"
-            value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
-            unit={` ${tempUnit}`}
-            sub={`${rangeLabel} avg`}
-          />
-          <StatCard
-            isAvg
-            label="Avg Humidity"
-            value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
-            unit="%"
-            sub={`${rangeLabel} avg`}
-          />
-          <StatCard
-            isAvg
-            label="Avg VPD"
-            value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
-            unit=" kPa"
-            sub={`${rangeLabel} avg`}
-            accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
-          />
-          <StatCard
-            label="Temperature"
-            value={latestTemp !== null ? String(latestTemp.value) : null}
-            unit={` ${tempUnit}`}
-            sub={ageSub}
-          />
-          <StatCard
-            label="Humidity"
-            value={latestHumidity !== null ? String(latestHumidity.value) : null}
-            unit="%"
-            sub={ageSub}
-          />
-          <StatCard
-            label="VPD"
-            value={currentVpd !== null ? currentVpd.toFixed(2) : null}
-            unit=" kPa"
-            sub={ageSub}
-            accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
-          />
-        </div>
+        <>
+          <div className="stats-row-label">Average over {rangeLabel}</div>
+          <div className="stats-grid">
+            <StatCard
+              isAvg
+              value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
+              unit={` ${tempUnit}`}
+            />
+            <StatCard
+              isAvg
+              value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
+              unit="%"
+            />
+            <StatCard
+              isAvg
+              value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
+              unit=" kPa"
+              accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
+            />
+            <StatCard
+              isAvg
+              value={avgStats.dimmer !== null ? avgStats.dimmer.toFixed(0) : null}
+              unit="%"
+            />
+          </div>
+
+          <div className="stats-row-label">Current</div>
+          <div className="stats-grid">
+            <StatCard
+              value={latestTemp !== null ? String(latestTemp.value) : null}
+              unit={` ${tempUnit}`}
+              sub={tempAgeSub}
+            />
+            <StatCard
+              value={latestHumidity !== null ? String(latestHumidity.value) : null}
+              unit="%"
+              sub={humidityAgeSub}
+            />
+            <StatCard
+              value={currentVpd !== null ? currentVpd.toFixed(2) : null}
+              unit=" kPa"
+              sub={tempAgeSub}
+              accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
+            />
+            <StatCard
+              value={latestDimmer !== null ? String(latestDimmer.value) : null}
+              unit="%"
+              sub={latestDimmer ? ageSubFor(latestDimmer) : '—'}
+            />
+          </div>
+        </>
       )}
 
       {loading && <div className="grow-loading">Loading…</div>}
@@ -353,7 +450,7 @@ export default function GrowDashboard() {
           <div className="chart-section">
             <h2 className="chart-title">Temperature</h2>
             <ResponsiveContainer width="99%" height={220}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={['auto', 'auto']} unit={` ${tempUnit}`} stroke="#888" tick={{ fontSize: 11 }} width={56} />
@@ -367,7 +464,7 @@ export default function GrowDashboard() {
           <div className="chart-section">
             <h2 className="chart-title">Humidity</h2>
             <ResponsiveContainer width="99%" height={220}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[45, 100]} ticks={[45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
@@ -377,11 +474,27 @@ export default function GrowDashboard() {
             </ResponsiveContainer>
           </div>
 
+          {/* Dimmer chart */}
+          {dimmerChartData.length > 0 && (
+            <div className="chart-section">
+              <h2 className="chart-title">Dimmer Level</h2>
+              <ResponsiveContainer width="99%" height={220}>
+                <LineChart data={dimmerChartData} margin={{ right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                  <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
+                  <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v}%`, 'Dimmer']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                  <Line type="stepAfter" dataKey="level" stroke="#facc15" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           {/* VPD chart */}
           <div className="chart-section">
             <h2 className="chart-title">VPD (kPa)</h2>
             <ResponsiveContainer width="99%" height={260}>
-              <LineChart data={chartData}>
+              <LineChart data={chartData} margin={{ right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                 <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 2.5]} unit=" kPa" stroke="#888" tick={{ fontSize: 11 }} width={60} />

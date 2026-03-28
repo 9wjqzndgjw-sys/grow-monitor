@@ -83,19 +83,28 @@
   font-weight: 600;
 }
 
-/* stats grid (3×2: top row = period averages, bottom row = current) */
+/* stats section banners + grid */
+.stats-row-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 .stat-card {
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 10px;
-  padding: 14px 12px;
+  padding: 10px 12px;
   text-align: center;
   border-top-width: 1px;
 }
@@ -109,27 +118,17 @@
   background: #1e1e1e;
 }
 
-.stat-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #666;
-  margin-bottom: 6px;
-}
-
-.stat-current .stat-label {
-  color: #888;
-}
 
 .stat-value {
-  font-size: 1.55rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.1;
   color: #bbb;
+  white-space: nowrap;
 }
 
 .stat-current .stat-value {
-  font-size: 1.8rem;
+  font-size: 1.45rem;
   color: #e5e5e5;
 }
 
@@ -202,6 +201,7 @@
 
 .vpd-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -215,6 +215,11 @@
   vertical-align: middle;
 }
 
+.vpd-swatch-cell {
+  width: 24px;
+  padding-right: 4px;
+}
+
 .vpd-swatch {
   display: inline-block;
   width: 12px;
@@ -226,15 +231,59 @@
   color: #ccc;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  min-width: 110px;
+  width: 38%;
 }
 
 .vpd-note {
   color: #aaa;
-  min-width: 140px;
 }
 
 .vpd-desc {
-  color: #666;
+  color: #555;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.refresh-btn {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  margin-left: auto;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.export-btn {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  color: #aaa;
+  padding: 6px 12px;
+  border-radius: 6px;
   font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.export-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.export-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
