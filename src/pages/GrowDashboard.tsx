@@ -130,6 +130,29 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
   })
 }
 
+async function fetchDimmerReadings(hours: number): Promise<Reading[]> {
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString()
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', 'Dimmer')
+    .eq('attribute', 'dimmer')
+    .gte('recorded_at', since)
+    .order('recorded_at', { ascending: true })
+  return data ?? []
+}
+
+async function fetchLatestDimmer(): Promise<Reading | null> {
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_id', 'Dimmer')
+    .eq('attribute', 'dimmer')
+    .order('recorded_at', { ascending: false })
+    .limit(1)
+  return data?.[0] ?? null
+}
+
 // ── components ───────────────────────────────────────────────────────────────
 
 function StatCard({ value, unit, sub, isAvg, accentColor }: {
@@ -194,6 +217,8 @@ export default function GrowDashboard() {
   const [selectedHours, setSelectedHours] = useState(6)
   const [readings, setReadings] = useState<Reading[]>([])
   const [latest, setLatest] = useState<Reading[]>([])
+  const [dimmerReadings, setDimmerReadings] = useState<Reading[]>([])
+  const [latestDimmer, setLatestDimmer] = useState<Reading | null>(null)
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -221,16 +246,19 @@ export default function GrowDashboard() {
 
     let isMounted = true
     setLoading(true)
-
     const loadData = async () => {
       try {
-        const [ts, lat] = await Promise.all([
+        const [ts, lat, dimTs, dimLat] = await Promise.all([
           fetchReadings(selectedDeviceId, selectedHours),
           fetchLatest(selectedDeviceId),
+          fetchDimmerReadings(selectedHours),
+          fetchLatestDimmer(),
         ])
         if (isMounted) {
           setReadings(ts)
           setLatest(lat)
+          setDimmerReadings(dimTs)
+          setLatestDimmer(dimLat)
         }
       } finally {
         if (isMounted) setLoading(false)
@@ -243,6 +271,18 @@ export default function GrowDashboard() {
 
   const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
   const chartData = useMemo(() => mergeIntoChartPoints(readings, bucketMs), [readings, bucketMs])
+
+  const dimmerChartData = useMemo(() => {
+    const buckets = new Map<number, number>()
+    for (const r of dimmerReadings) {
+      const ts = new Date(r.recorded_at).getTime()
+      const bucket = Math.round(ts / bucketMs) * bucketMs
+      buckets.set(bucket, Number(r.value))
+    }
+    return Array.from(buckets.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([ts, level]) => ({ ts, level }))
+  }, [dimmerReadings, bucketMs])
 
   const tempUnit = latest.find(r => r.attribute === 'temperature')?.unit ?? '°F'
 
@@ -265,8 +305,9 @@ export default function GrowDashboard() {
       temp: avg(chartData.map(p => p.temperature)),
       humidity: avg(chartData.map(p => p.humidity)),
       vpd: avg(chartData.map(p => p.vpd)),
+      dimmer: avg(dimmerChartData.map(p => p.level)),
     }
-  }, [chartData])
+  }, [chartData, dimmerChartData])
 
   const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
   const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
@@ -290,7 +331,7 @@ export default function GrowDashboard() {
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
   function exportCsv() {
-    const rows = readings
+    const rows = [...readings, ...dimmerReadings]
       .slice()
       .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
     const header = 'timestamp,attribute,value,unit'
@@ -383,6 +424,11 @@ export default function GrowDashboard() {
               unit=" kPa"
               accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
             />
+            <StatCard
+              isAvg
+              value={avgStats.dimmer !== null ? avgStats.dimmer.toFixed(0) : null}
+              unit="%"
+            />
           </div>
 
           <div className="stats-row-label">Current</div>
@@ -402,6 +448,11 @@ export default function GrowDashboard() {
               unit=" kPa"
               sub={tempAgeSub}
               accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
+            />
+            <StatCard
+              value={latestDimmer !== null ? String(latestDimmer.value) : null}
+              unit="%"
+              sub={latestDimmer ? ageSubFor(latestDimmer) : '—'}
             />
           </div>
         </>
@@ -438,6 +489,22 @@ export default function GrowDashboard() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Dimmer chart */}
+          {dimmerChartData.length > 0 && (
+            <div className="chart-section">
+              <h2 className="chart-title">Dimmer Level</h2>
+              <ResponsiveContainer width="99%" height={220}>
+                <LineChart data={dimmerChartData} margin={{ right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                  <XAxis dataKey="ts" tickFormatter={formatShortTime} stroke="#888" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} unit="%" stroke="#888" tick={{ fontSize: 11 }} width={44} />
+                  <Tooltip labelFormatter={formatTime} formatter={(v: unknown) => [`${v}%`, 'Dimmer']} contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
+                  <Line type="stepAfter" dataKey="level" stroke="#facc15" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* VPD chart */}
           <div className="chart-section">
