@@ -96,16 +96,10 @@ function mergeIntoChartPoints(readings: Reading[], bucketMs: number): ChartPoint
 
 async function fetchDevices(): Promise<Device[]> {
   const { data } = await supabase
-    .from('sensor_readings')
+    .from('devices')
     .select('device_id, device_name')
     .order('device_name')
-  if (!data) return []
-  const seen = new Set<string>()
-  return data.filter(d => {
-    if (seen.has(d.device_id)) return false
-    seen.add(d.device_id)
-    return true
-  })
+  return data ?? []
 }
 
 async function fetchReadings(deviceId: string, hours: number): Promise<Reading[]> {
@@ -227,6 +221,13 @@ export default function GrowDashboard() {
   const [latestDimmer, setLatestDimmer] = useState<Reading | null>(null)
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+
+  // Keep 'now' fresh every minute for age calculations
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   // Load device list on mount
   useEffect(() => {
@@ -242,18 +243,30 @@ export default function GrowDashboard() {
   // Load time-series and latest readings when device/range changes
   useEffect(() => {
     if (!selectedDeviceId) return
+
+    let isMounted = true
     setLoading(true)
-    Promise.all([
-      fetchReadings(selectedDeviceId, selectedHours),
-      fetchLatest(selectedDeviceId),
-      fetchDimmerReadings(selectedHours),
-      fetchLatestDimmer(),
-    ]).then(([ts, lat, dimTs, dimLat]) => {
-      setReadings(ts)
-      setLatest(lat)
-      setDimmerReadings(dimTs)
-      setLatestDimmer(dimLat)
-    }).finally(() => setLoading(false))
+    const loadData = async () => {
+      try {
+        const [ts, lat, dimTs, dimLat] = await Promise.all([
+          fetchReadings(selectedDeviceId, selectedHours),
+          fetchLatest(selectedDeviceId),
+          fetchDimmerReadings(selectedHours),
+          fetchLatestDimmer(),
+        ])
+        if (isMounted) {
+          setReadings(ts)
+          setLatest(lat)
+          setDimmerReadings(dimTs)
+          setLatestDimmer(dimLat)
+        }
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    loadData()
+    return () => { isMounted = false }
   }, [selectedDeviceId, selectedHours, refreshKey])
 
   const bucketMs = TIME_RANGES.find(r => r.hours === selectedHours)?.bucketMs ?? 5 * 60 * 1000
@@ -298,6 +311,7 @@ export default function GrowDashboard() {
 
   const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
   const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
+
   function formatAge(mins: number): string {
     if (mins < 1) return 'just now'
     if (mins < 60) return `${mins}m ago`
@@ -305,11 +319,13 @@ export default function GrowDashboard() {
     const m = mins % 60
     return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
   }
+
   function ageSubFor(r: typeof latestTemp) {
     if (!r) return '—'
-    const mins = Math.round((Date.now() - new Date(r.recorded_at).getTime()) / 60000)
+    const mins = Math.round((now - new Date(r.recorded_at).getTime()) / 60000)
     return formatAge(mins)
   }
+
   const tempAgeSub = ageSubFor(latestTemp)
   const humidityAgeSub = ageSubFor(latestHumidity)
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
