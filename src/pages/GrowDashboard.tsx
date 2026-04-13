@@ -234,7 +234,7 @@ export default function GrowDashboard() {
     fetchDevices().then(devs => {
       setDevices(devs)
       if (devs.length > 0) {
-        const preferred = devs.find(d => d.device_name === 'Sonoff Hygrometer 2')
+        const preferred = devs.find(d => d.device_name === 'Yo Link Canopy')
         setSelectedDeviceId((preferred ?? devs[0]).device_id)
       }
     })
