@@ -1,0 +1,86 @@
+# Vercel Logs: Hubitat Webhook
+**Export Date:** 2026-03-28T06:15:02  
+**Project:** grow-monitor (prj_d42anQN7SWPr6hWxTMvk9KD3MFGo)  
+**Endpoint:** `/api/hubitat-webhook`
+
+---
+
+## Summary
+- **Total Requests:** 47 function invocations
+- **Time Range:** 05:20:05 UTC to 06:06:17 UTC
+- **Response Status:** All HTTP 200
+- **Deprecation Warnings:** 4 instances of `[DEP0169]` url.parse() warning
+- **Query Parameter:** `secret=72773d804474bdc`
+
+---
+
+## Key Observations
+
+### ✅ Successful Operations
+- All requests returned HTTP 200 status
+- Requests are consistently reaching the Vercel function
+- Duration typically 150–600ms (normal serverless performance)
+- Memory usage stable: 246–269 MB (well under 2GB limit)
+
+### ⚠️ Deprecation Warnings
+Four error-level log entries show the `[DEP0169]` deprecation warning:
+
+| UTC Time | Duration | Instance | Details |
+|----------|----------|----------|---------|
+| 05:20:05 | 1,111 ms | BwVWMA0GzmXs | url.parse() deprecation warning + slower execution |
+| 05:20:06 | — | — | Same warning (stderr output) |
+| 05:41:35 | 1,070 ms | 9iM2wT62RboX | url.parse() deprecation warning + slower execution |
+| 05:41:35 | — | — | Same warning (stderr output) |
+| 05:50:46 | 962 ms | POFyVAmEpwnq | url.parse() deprecation warning + slower execution |
+| 05:50:47 | — | — | Same warning (stderr output) |
+| 05:54:33 | 777 ms | CGtQusHFly7l | url.parse() deprecation warning + slower execution |
+| 05:54:34 | — | — | Same warning (stderr output) |
+
+### Pattern Analysis
+- **User-Agent:** `Apache-HttpClient/4.5.13 (Java/11.0.28)` — Hubitat is reliably sending POST requests
+- **Region:** iad1 (Virginia)
+- **Concurrency:** Peaks at 2 concurrent invocations (05:24:13)
+- **No errors:** All requests processed successfully (no 5xx errors, no timeouts)
+
+---
+
+## Deprecation Warning Details
+
+```
+[DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone 
+to errors that have security implications. Use the WHATWG URL API instead. CVEs 
+are not issued for `url.parse()` vulnerabilities.
+```
+
+**Likely source:** A dependency in your Vercel function or its imports is using Node's deprecated `url.parse()` instead of the modern `URL` API.
+
+**Impact:** The warning itself doesn't break functionality (all requests complete successfully), but indicates a security/standardization issue in your codebase or dependencies.
+
+---
+
+## Recommendations
+
+1. **Trace the deprecation warning source:**
+   ```bash
+   node --trace-deprecation your-function.js
+   ```
+
+2. **Check package.json** for outdated dependencies — run `npm audit` to identify candidates
+
+3. **If in your code:** Replace any `url.parse()` calls with the WHATWG API:
+   ```javascript
+   // Old
+   const parsed = url.parse(myUrl);
+   
+   // New
+   const parsed = new URL(myUrl);
+   ```
+
+4. **If in a dependency:** Update that package or open an issue with the maintainer
+
+---
+
+## Data Quality
+- **Request flow:** Hubitat → Vercel → Function execution: ✅ Working
+- **Webhook acknowledgment:** All 200 responses sent back to Hubitat
+- **Data persistence:** Logs don't show error-level messages about database writes (suggests Supabase inserts may be silently succeeding or being logged elsewhere
