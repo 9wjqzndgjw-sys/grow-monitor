@@ -49,18 +49,14 @@ export async function latestTentModel(
   return (data?.[0] ?? null) as TentModelRow | null
 }
 
-export async function listSimRuns(limit = 20): Promise
-  Array<SimRunRow & { metrics: SimMetricsRow | null; params_name: string; setpoint_name: string }>
-> {
+export async function listSimRuns(limit = 20): Promise<Array<SimRunRow & { metrics: SimMetricsRow | null; params_name: string; setpoint_name: string }>> {
   const { data, error } = await supabase
     .from('pid_run_leaderboard')
     .select('*')
     .limit(limit)
   if (error) throw error
   // The view returns flat rows; callers reshape as needed.
-  return (data ?? []) as unknown as Array
-    SimRunRow & { metrics: SimMetricsRow | null; params_name: string; setpoint_name: string }
-  >
+  return (data ?? []) as unknown as Array<SimRunRow & { metrics: SimMetricsRow | null; params_name: string; setpoint_name: string }>
 }
 
 // ── History fetch for model fitting + replay ────────────────────────────────
