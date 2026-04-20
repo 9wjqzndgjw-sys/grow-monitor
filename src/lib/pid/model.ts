@@ -99,6 +99,8 @@ export interface FitResult {
   windowHours: number
 }
 
+const MAX_GAP_S = 1800 // skip gaps > 30 minutes
+
 /**
  * Fit a TentModel from time-series samples using ordinary least squares.
  *
@@ -134,7 +136,7 @@ export function fitTentModel(
     const a = samples[i]
     const b = samples[i + 1]
     const dtS = (b.tMs - a.tMs) / 1000
-    if (dtS <= 0 || dtS > 1800) continue // skip gaps > 30 min
+    if (dtS <= 0 || dtS > MAX_GAP_S) continue
 
     const dyDt = (b.y - a.y) / dtS
     targets.push(dyDt)
@@ -188,7 +190,7 @@ export function fitTentModel(
     const a = samples[i]
     const b = samples[i + 1]
     const dtS = (b.tMs - a.tMs) / 1000
-    if (dtS <= 0 || dtS > 1800) continue
+    if (dtS <= 0 || dtS > MAX_GAP_S) continue
     const yPred = step(
       model,
       a.y,

@@ -111,16 +111,16 @@ export function computeMetrics(
   if (Math.abs(sp0 - initial) > 1e-6) {
     const target10 = initial + (sp0 - initial) * 0.1
     const target90 = initial + (sp0 - initial) * 0.9
-    let t10 = -1
-    let t90 = -1
+    let t10: number | null = null
+    let t90: number | null = null
     for (const s of samples) {
-      if (t10 < 0 && ((rising && s.rh >= target10) || (!rising && s.rh <= target10))) t10 = s.t_s
-      if (t90 < 0 && ((rising && s.rh >= target90) || (!rising && s.rh <= target90))) {
+      if (t10 === null && ((rising && s.rh >= target10) || (!rising && s.rh <= target10))) t10 = s.t_s
+      if (t90 === null && ((rising && s.rh >= target90) || (!rising && s.rh <= target90))) {
         t90 = s.t_s
         break
       }
     }
-    if (t10 >= 0 && t90 >= 0) riseTimeS = t90 - t10
+    if (t10 !== null && t90 !== null) riseTimeS = t90 - t10
   }
 
   // --- settling time — last time we left the ±band around final SP --------
