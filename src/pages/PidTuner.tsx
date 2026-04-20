@@ -83,6 +83,13 @@ export default function PidTuner() {
     })()
   }, [])
 
+  async function apiJson(resp: Response): Promise<Record<string, unknown>> {
+    const text = await resp.text()
+    try { return JSON.parse(text) } catch {
+      throw new Error(`Server error (${resp.status}): ${text.slice(0, 200)}`)
+    }
+  }
+
   function onParamChange(id: number) {
     setSelectedParamId(id)
     const row = paramSets.find((p) => p.id === id)
@@ -142,8 +149,8 @@ export default function PidTuner() {
         }),
       })
       if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}))
-        throw new Error(body.error ?? `Save failed: ${resp.status}`)
+        const body = await apiJson(resp).catch(() => ({}))
+        throw new Error((body as Record<string,unknown>).error as string ?? `Save failed: ${resp.status}`)
       }
       loadLeaderboard()
     } catch (err) {
@@ -173,8 +180,8 @@ export default function PidTuner() {
           lights_on: lightsOn,
         }),
       })
-      const body = await resp.json()
-      if (!resp.ok) throw new Error(body.error ?? 'Replay failed')
+      const body = await apiJson(resp)
+      if (!resp.ok) throw new Error(body.error as string ?? 'Replay failed')
 
       // Load the samples back for charting
       const { data } = await supabase
@@ -183,7 +190,7 @@ export default function PidTuner() {
         .eq('run_id', body.run_id)
         .order('t_s', { ascending: true })
       setSamples((data ?? []) as SimSample[])
-      setMetrics(body.metrics)
+      setMetrics(body.metrics as Metrics)
       loadLeaderboard()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -206,8 +213,8 @@ export default function PidTuner() {
           lights_on: lightsOn,
         }),
       })
-      const body = await resp.json()
-      if (!resp.ok) throw new Error(body.error ?? 'Fit failed')
+      const body = await apiJson(resp)
+      if (!resp.ok) throw new Error(body.error as string ?? 'Fit failed')
       const mh = await latestTentModel(HUMIDITY_DEVICE, 'humidity')
       setModelH(mh)
     } catch (err) {

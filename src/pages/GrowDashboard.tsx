@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceArea, Legend,
@@ -352,11 +353,14 @@ export default function GrowDashboard() {
     <div className="grow-dashboard">
       <header className="grow-header">
         <h1>Grow Monitor</h1>
-        {currentVpd !== null && (
-          <div className="grow-vpd-badge" style={{ background: VPD_ZONE_COLORS[vpdZone(currentVpd)] }}>
-            VPD {currentVpd} kPa
-          </div>
-        )}
+        <div className="grow-header-right">
+          {currentVpd !== null && (
+            <div className="grow-vpd-badge" style={{ background: VPD_ZONE_COLORS[vpdZone(currentVpd)] }}>
+              VPD {currentVpd} kPa
+            </div>
+          )}
+          <Link to="/pid" className="grow-pid-link">PID Tuner</Link>
+        </div>
       </header>
 
       {/* Controls */}
