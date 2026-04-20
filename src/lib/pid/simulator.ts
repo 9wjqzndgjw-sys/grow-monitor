@@ -13,7 +13,7 @@ import {
   tick,
   type PidConfig,
 } from './controller'
-import { step, type TentModel, type Inputs } from './model'
+import { step, MAX_GAP_S, type TentModel, type Inputs } from './model'
 import type { SimSample, SetpointRow } from './types'
 
 export interface SimConfig {
@@ -255,7 +255,7 @@ export function replayFromHistory(
     // Advance model using REAL actuator inputs (not the sim-predicted fan).
     if (i < points.length - 1) {
       const dtS = (points[i + 1].tMs - p.tMs) / 1000
-      if (dtS > 0 && dtS < 1800) {
+      if (dtS > 0 && dtS < MAX_GAP_S) {
         rhModel = step(
           modelHumidity,
           rhModel,
