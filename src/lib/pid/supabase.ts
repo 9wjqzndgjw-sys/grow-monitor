@@ -34,6 +34,19 @@ export async function listSetpoints(): Promise<SetpointRow[]> {
   return (data ?? []) as SetpointRow[]
 }
 
+export async function listDeviceIds(attributes: string[], sinceDays = 30): Promise<string[]> {
+  const since = new Date(Date.now() - sinceDays * 86400_000)
+  const { data, error } = await supabase
+    .from('sensor_readings')
+    .select('device_id')
+    .in('attribute', attributes)
+    .gte('recorded_at', since.toISOString())
+  if (error) throw error
+  const seen = new Set<string>()
+  for (const r of (data ?? []) as Array<{ device_id: string }>) seen.add(r.device_id)
+  return Array.from(seen).sort()
+}
+
 export async function latestTentModel(
   deviceId: string,
   metric: 'humidity' | 'temperature',

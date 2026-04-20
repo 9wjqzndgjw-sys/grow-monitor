@@ -8,6 +8,7 @@ import {
   listPidParams,
   listSetpoints,
   latestTentModel,
+  listDeviceIds,
 } from '../lib/pid/supabase'
 import {
   runSimulation,
@@ -28,9 +29,6 @@ import './PidTuner.css'
 // Config
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HUMIDITY_DEVICE = 'YoLink Canopy'   // matches your existing dashboard default
-const FAN_DEVICE = 'Dimmer'
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +40,10 @@ export default function PidTuner() {
   const [selectedSetpointId, setSelectedSetpointId] = useState<number | null>(null)
   const [modelH, setModelH] = useState<TentModelRow | null>(null)
   const [modelT, setModelT] = useState<TentModelRow | null>(null)
+  const [humidityDevices, setHumidityDevices] = useState<string[]>([])
+  const [fanDevices, setFanDevices] = useState<string[]>([])
+  const [humidityDevice, setHumidityDevice] = useState('')
+  const [fanDevice, setFanDevice] = useState('')
 
   // Live-editable gains (copy of selected row, overridable before running)
   const [kp, setKp] = useState(3.0)
@@ -62,16 +64,18 @@ export default function PidTuner() {
   // ── load data ──────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [p, s, mh, mt] = await Promise.all([
+      const [p, s, humDev, fanDev] = await Promise.all([
         listPidParams(),
         listSetpoints(),
-        latestTentModel(HUMIDITY_DEVICE, 'humidity'),
-        latestTentModel(HUMIDITY_DEVICE, 'temperature'),
+        listDeviceIds(['humidity']),
+        listDeviceIds(['dimmer', 'level', 'fan']),
       ])
       setParamSets(p)
       setSetpoints(s)
-      setModelH(mh)
-      setModelT(mt)
+      setHumidityDevices(humDev)
+      setFanDevices(fanDev)
+      setHumidityDevice(humDev[0] ?? '')
+      setFanDevice(fanDev[0] ?? '')
       if (p.length) {
         setSelectedParamId(p[0].id)
         setKp(Number(p[0].kp))
@@ -82,6 +86,18 @@ export default function PidTuner() {
       loadLeaderboard()
     })()
   }, [])
+
+  useEffect(() => {
+    if (!humidityDevice) return
+    ;(async () => {
+      const [mh, mt] = await Promise.all([
+        latestTentModel(humidityDevice, 'humidity'),
+        latestTentModel(humidityDevice, 'temperature'),
+      ])
+      setModelH(mh)
+      setModelT(mt)
+    })()
+  }, [humidityDevice])
 
   async function apiJson(resp: Response): Promise<Record<string, unknown>> {
     const text = await resp.text()
@@ -174,8 +190,8 @@ export default function PidTuner() {
           params_id: selectedParamId,
           setpoint_id: selectedSetpointId,
           model_humidity_id: modelH.id,
-          humidity_device_id: HUMIDITY_DEVICE,
-          fan_device_id: FAN_DEVICE,
+          humidity_device_id: humidityDevice,
+          fan_device_id: fanDevice,
           hours,
           lights_on: lightsOn,
         }),
@@ -207,15 +223,15 @@ export default function PidTuner() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          humidity_device_id: HUMIDITY_DEVICE,
-          fan_device_id: FAN_DEVICE,
+          humidity_device_id: humidityDevice,
+          fan_device_id: fanDevice,
           hours,
           lights_on: lightsOn,
         }),
       })
       const body = await apiJson(resp)
       if (!resp.ok) throw new Error(body.error as string ?? 'Fit failed')
-      const mh = await latestTentModel(HUMIDITY_DEVICE, 'humidity')
+      const mh = await latestTentModel(humidityDevice, 'humidity')
       setModelH(mh)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -305,6 +321,20 @@ export default function PidTuner() {
                 {s.name} — {s.stage}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="pid-field">
+          <label>Humidity sensor</label>
+          <select value={humidityDevice} onChange={(e) => setHumidityDevice(e.target.value)}>
+            {humidityDevices.map((d) => <option key={d} value={d}>{d}</option>)}
+            {!humidityDevices.length && <option value="">Loading…</option>}
+          </select>
+        </div>
+        <div className="pid-field">
+          <label>Fan device</label>
+          <select value={fanDevice} onChange={(e) => setFanDevice(e.target.value)}>
+            {fanDevices.map((d) => <option key={d} value={d}>{d}</option>)}
+            {!fanDevices.length && <option value="">Loading…</option>}
           </select>
         </div>
         <div className="pid-field small">
