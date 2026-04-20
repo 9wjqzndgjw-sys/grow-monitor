@@ -38,15 +38,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabase = serviceClient()
-    const { error } = await supabase.from('sensor_readings').insert({
-      device_id: String(deviceId),
-      device_name: displayName ?? String(deviceId),
-      attribute: name,
-      value: numericValue,
-      unit: unit ?? null,
-    })
+    const resolvedName = displayName ?? String(deviceId)
+
+    const [{ error }, { error: deviceError }] = await Promise.all([
+      supabase.from('sensor_readings').insert({
+        device_id: String(deviceId),
+        device_name: resolvedName,
+        attribute: name,
+        value: numericValue,
+        unit: unit ?? null,
+      }),
+      supabase.from('devices').upsert(
+        { device_id: String(deviceId), device_name: resolvedName },
+        { onConflict: 'device_id', ignoreDuplicates: false }
+      ),
+    ])
 
     if (error) throw error
+    if (deviceError) console.warn('[hubitat-webhook] device upsert warning:', deviceError)
 
     return res.status(200).json({ ok: true })
   } catch (err) {
