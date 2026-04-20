@@ -99,7 +99,7 @@ export interface FitResult {
   windowHours: number
 }
 
-const MAX_GAP_S = 1800 // skip gaps > 30 minutes
+export const MAX_GAP_S = 1800 // skip gaps > 30 minutes
 
 /**
  * Fit a TentModel from time-series samples using ordinary least squares.
