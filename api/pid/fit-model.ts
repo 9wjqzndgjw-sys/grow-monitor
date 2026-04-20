@@ -10,10 +10,9 @@ import { createClient } from '@supabase/supabase-js'
 import { fitTentModel, type FitSample } from '../../src/lib/pid'
 
 function serviceClient() {
-  return createClient(
-    process.env.VITE_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
+  if (!url) throw new Error('Missing SUPABASE_URL or VITE_SUPABASE_URL')
+  return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

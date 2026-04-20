@@ -8,6 +8,8 @@ import {
   listPidParams,
   listSetpoints,
   latestTentModel,
+} from '../lib/pid/supabase'
+import {
   runSimulation,
   computeMetrics,
   configFromRow,
