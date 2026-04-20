@@ -175,14 +175,11 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-### Recommended (Server Compatibility)
+### Optional (Server Compatibility)
 
 ```bash
 SUPABASE_URL=https://<project-ref>.supabase.co
 ```
-
-> ⚠️ The PID endpoints currently depend on `VITE_SUPABASE_URL`.
-> It is recommended to support both `SUPABASE_URL` and `VITE_SUPABASE_URL`.
 
 ---
 
@@ -211,23 +208,14 @@ SUPABASE_URL=https://<project-ref>.supabase.co
 
 ## ⚠️ Known Gotchas
 
-### 1. Environment Variable Mismatch
-
-* API uses `VITE_SUPABASE_URL`
-* Vercel often uses `SUPABASE_URL`
-
-**Fix:** support both
-
----
-
-### 2. Service Role Key Missing
+### 1. Service Role Key Missing
 
 * PID endpoints require elevated access
 * Without it → API failures
 
 ---
 
-### 3. Hardcoded Device IDs
+### 2. Hardcoded Device IDs
 
 In `PidTuner.tsx`:
 
@@ -240,7 +228,7 @@ If your DB uses different IDs → tuner fails silently or returns empty data.
 
 ---
 
-### 4. Sensor Timing Mismatch
+### 3. Sensor Timing Mismatch
 
 * Temperature and humidity may not update simultaneously
 * System compensates via forward-fill
