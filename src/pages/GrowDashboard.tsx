@@ -304,7 +304,7 @@ export default function GrowDashboard() {
   // Load fixed device panel readings
   useEffect(() => {
     Promise.all([
-      fetchLatestByName('Sonoff Canopy 2'),
+      fetchLatestByName('Sonoff 2 Canopy'),
       fetchLatestByName('Aqara W100'),
       fetchLatestDimmer(),
     ]).then(([canopy, aqara, dimmer]) => {
@@ -459,7 +459,7 @@ export default function GrowDashboard() {
 
       {/* Device panel rows */}
       <div className="device-rows">
-        <DeviceStatRow label="Sonoff Canopy 2" readings={canopyLatest} now={now} />
+        <DeviceStatRow label="Sonoff 2 Canopy" readings={canopyLatest} now={now} />
         <DeviceStatRow label="Aqara W100" readings={aqaraLatest} now={now} />
         <div className="device-row">
           <div className="device-row-label">Dimmer</div>
