@@ -131,6 +131,22 @@ async function fetchLatest(deviceId: string): Promise<Reading[]> {
   })
 }
 
+async function fetchLatestByName(deviceName: string): Promise<Reading[]> {
+  const { data } = await supabase
+    .from('sensor_readings')
+    .select('attribute, value, unit, recorded_at')
+    .eq('device_name', deviceName)
+    .order('recorded_at', { ascending: false })
+    .limit(100)
+  if (!data) return []
+  const seen = new Set<string>()
+  return data.filter(r => {
+    if (seen.has(r.attribute)) return false
+    seen.add(r.attribute)
+    return true
+  })
+}
+
 async function fetchDimmerReadings(hours: number): Promise<Reading[]> {
   const since = new Date(Date.now() - hours * 3600 * 1000).toISOString()
   const { data } = await supabase
@@ -173,6 +189,49 @@ function StatCard({ value, unit, sub, isAvg, accentColor }: {
         {value !== null && <span className="stat-unit">{unit}</span>}
       </div>
       {sub && <div className="stat-sub">{sub}</div>}
+    </div>
+  )
+}
+
+function DeviceStatRow({ label, readings, now }: {
+  label: string
+  readings: Reading[]
+  now: number
+}) {
+  const tempR = readings.find(r => r.attribute === 'temperature') ?? null
+  const humR  = readings.find(r => r.attribute === 'humidity')    ?? null
+  const tempUnit = tempR?.unit ?? '°F'
+
+  let vpd: number | null = null
+  if (tempR && humR) {
+    const tempC = (tempR.unit ?? '°F').includes('F')
+      ? celsiusFromFahrenheit(tempR.value)
+      : tempR.value
+    vpd = computeVpd(tempC, humR.value)
+  }
+
+  function age(r: Reading | null): string | undefined {
+    if (!r) return undefined
+    const mins = Math.round((now - new Date(r.recorded_at).getTime()) / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const h = Math.floor(mins / 60), m = mins % 60
+    return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
+  }
+
+  return (
+    <div className="device-row">
+      <div className="device-row-label">{label}</div>
+      <div className="device-panels">
+        <StatCard value={tempR ? String(tempR.value) : null} unit={` ${tempUnit}`} sub={age(tempR)} />
+        <StatCard value={humR  ? String(humR.value)  : null} unit="%" sub={age(humR)} />
+        <StatCard
+          value={vpd !== null ? vpd.toFixed(2) : null}
+          unit=" kPa"
+          sub={age(tempR ?? humR)}
+          accentColor={vpd !== null ? VPD_ZONE_COLORS[vpdZone(vpd)] : undefined}
+        />
+      </div>
     </div>
   )
 }
@@ -220,6 +279,8 @@ export default function GrowDashboard() {
   const [latest, setLatest] = useState<Reading[]>([])
   const [dimmerReadings, setDimmerReadings] = useState<Reading[]>([])
   const [latestDimmer, setLatestDimmer] = useState<Reading | null>(null)
+  const [canopyLatest, setCanopyLatest] = useState<Reading[]>([])
+  const [aqaraLatest, setAqaraLatest] = useState<Reading[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -239,6 +300,19 @@ export default function GrowDashboard() {
       }
     })
   }, [])
+
+  // Load fixed device panel readings
+  useEffect(() => {
+    Promise.all([
+      fetchLatestByName('Sonoff Canopy 2'),
+      fetchLatestByName('Aqara W100'),
+      fetchLatestDimmer(),
+    ]).then(([canopy, aqara, dimmer]) => {
+      setCanopyLatest(canopy)
+      setAqaraLatest(aqara)
+      setLatestDimmer(dimmer)
+    })
+  }, [refreshKey])
 
   // Load time-series and latest readings when device/range changes
   useEffect(() => {
@@ -296,38 +370,15 @@ export default function GrowDashboard() {
     return computeVpd(tempC, h.value)
   }, [latest])
 
-  const avgStats = useMemo(() => {
-    const avg = (vals: (number | null)[]) => {
-      const nums = vals.filter((v): v is number => v !== null)
-      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
-    }
-    return {
-      temp: avg(chartData.map(p => p.temperature)),
-      humidity: avg(chartData.map(p => p.humidity)),
-      vpd: avg(chartData.map(p => p.vpd)),
-      dimmer: avg(dimmerChartData.map(p => p.level)),
-    }
-  }, [chartData, dimmerChartData])
-
-  const latestTemp = latest.find(r => r.attribute === 'temperature') ?? null
-  const latestHumidity = latest.find(r => r.attribute === 'humidity') ?? null
-
-  function formatAge(mins: number): string {
+  function ageSubFor(r: Reading | null): string {
+    if (!r) return '—'
+    const mins = Math.round((now - new Date(r.recorded_at).getTime()) / 60000)
     if (mins < 1) return 'just now'
     if (mins < 60) return `${mins}m ago`
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
+    const h = Math.floor(mins / 60), m = mins % 60
     return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`
   }
 
-  function ageSubFor(r: typeof latestTemp) {
-    if (!r) return '—'
-    const mins = Math.round((now - new Date(r.recorded_at).getTime()) / 60000)
-    return formatAge(mins)
-  }
-
-  const tempAgeSub = ageSubFor(latestTemp)
-  const humidityAgeSub = ageSubFor(latestHumidity)
   const rangeLabel = TIME_RANGES.find(r => r.hours === selectedHours)?.label ?? ''
 
   function exportCsv() {
@@ -406,60 +457,21 @@ export default function GrowDashboard() {
         </button>
       </div>
 
-      {/* Stats rows */}
-      {!loading && (latest.length > 0 || chartData.length > 0) && (
-        <>
-          <div className="stats-row-label">Average over {rangeLabel}</div>
-          <div className="stats-grid">
-            <StatCard
-              isAvg
-              value={avgStats.temp !== null ? avgStats.temp.toFixed(1) : null}
-              unit={` ${tempUnit}`}
-            />
-            <StatCard
-              isAvg
-              value={avgStats.humidity !== null ? avgStats.humidity.toFixed(1) : null}
-              unit="%"
-            />
-            <StatCard
-              isAvg
-              value={avgStats.vpd !== null ? avgStats.vpd.toFixed(2) : null}
-              unit=" kPa"
-              accentColor={avgStats.vpd !== null ? VPD_ZONE_COLORS[vpdZone(avgStats.vpd)] : undefined}
-            />
-            <StatCard
-              isAvg
-              value={avgStats.dimmer !== null ? avgStats.dimmer.toFixed(0) : null}
-              unit="%"
-            />
-          </div>
-
-          <div className="stats-row-label">Current</div>
-          <div className="stats-grid">
-            <StatCard
-              value={latestTemp !== null ? String(latestTemp.value) : null}
-              unit={` ${tempUnit}`}
-              sub={tempAgeSub}
-            />
-            <StatCard
-              value={latestHumidity !== null ? String(latestHumidity.value) : null}
-              unit="%"
-              sub={humidityAgeSub}
-            />
-            <StatCard
-              value={currentVpd !== null ? currentVpd.toFixed(2) : null}
-              unit=" kPa"
-              sub={tempAgeSub}
-              accentColor={currentVpd !== null ? VPD_ZONE_COLORS[vpdZone(currentVpd)] : undefined}
-            />
+      {/* Device panel rows */}
+      <div className="device-rows">
+        <DeviceStatRow label="Sonoff Canopy 2" readings={canopyLatest} now={now} />
+        <DeviceStatRow label="Aqara W100" readings={aqaraLatest} now={now} />
+        <div className="device-row">
+          <div className="device-row-label">Dimmer</div>
+          <div className="device-panels">
             <StatCard
               value={latestDimmer !== null ? String(latestDimmer.value) : null}
               unit="%"
-              sub={latestDimmer ? ageSubFor(latestDimmer) : '—'}
+              sub={ageSubFor(latestDimmer)}
             />
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
       {loading && <div className="grow-loading">Loading…</div>}
 
