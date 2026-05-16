@@ -289,10 +289,10 @@ export default function GrowDashboard() {
     return () => clearInterval(timer)
   }, [])
 
-  // Load device list on mount — auto-select Sonoff 2 Canopy
+  // Load device list on mount — auto-select Sonoff Hygrometer 1
   useEffect(() => {
     fetchDevices().then(devs => {
-      const canopy = devs.find(d => d.device_name === 'Sonoff 2 Canopy')
+      const canopy = devs.find(d => d.device_name === 'Sonoff Hygrometer 1')
       if (canopy) setSelectedDeviceId(canopy.device_id)
       else if (devs.length > 0) setSelectedDeviceId(devs[0].device_id)
     })
@@ -301,7 +301,7 @@ export default function GrowDashboard() {
   // Load fixed device panel readings
   useEffect(() => {
     Promise.all([
-      fetchLatestByName('Sonoff 2 Canopy'),
+      fetchLatestByName('Sonoff Hygrometer 1'),
       fetchLatestDimmer(),
     ]).then(([canopy, dimmer]) => {
       setCanopyLatest(canopy)
@@ -443,7 +443,7 @@ export default function GrowDashboard() {
 
       {/* Device panel rows */}
       <div className="device-rows">
-        <DeviceStatRow label="Sonoff 2 Canopy" readings={canopyLatest} now={now} />
+        <DeviceStatRow label="Sonoff Hygrometer 1" readings={canopyLatest} now={now} />
         <div className="device-row">
           <div className="device-row-label">Dimmer</div>
           <div className="device-panels">
