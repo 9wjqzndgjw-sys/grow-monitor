@@ -1,10 +1,11 @@
-// PID controller — 1:1 port of the Hubitat Cannabis Climate Controller v2
-// Groovy app. Same dt units (minutes), same anti-windup clamp, same 20–100
-// fan clamp, same 3 % deadband, same warm-seeded integral on reset, same
-// tent-open suppression, same light-triggered reset.
+// PID controller — 1:1 port of the Hubitat Cannabis Climate Controller v3
+// Groovy app (smartapps/cannabis-climate-controller-v3.groovy). Same dt units
+// (minutes), same anti-windup clamp, same 3 % deadband, same warm-seeded
+// integral on reset, same tent-open suppression, same light-triggered reset,
+// same v3 humidifier/heater hysteresis.
 //
 // Keep this file faithful — every deviation widens the gap between sim and
-// reality. If Hubitat logic changes, change here too.
+// reality. If the Groovy app changes, change here too.
 
 import type { PidParamsRow, SetpointRow } from './types'
 
@@ -206,6 +207,26 @@ export function makeAuxState(): AuxState {
   return { constantHumOn: false, boostHumOn: false, heaterOn: false }
 }
 
+// v3 aux tunables. Defaults mirror the Groovy `defaultValue`s so a sim with
+// no overrides reproduces the shipped controller exactly.
+export interface AuxConfig {
+  /** Groovy `heaterAllowLightsOn` — run heater during lights ON. */
+  heaterAllowLightsOn: boolean
+  /** Groovy `heaterOnDiff` — ON when temp this far below target (°F). */
+  heaterOnDiffF: number
+  /** Groovy `heaterOffDiff` — OFF when temp this far above target (°F). */
+  heaterOffDiffF: number
+  /** Groovy SEEDLING stage runs the constant humidifier 24/7. */
+  constantHumidifierAlwaysOn: boolean
+}
+
+export const DEFAULT_AUX_CONFIG: AuxConfig = {
+  heaterAllowLightsOn: true,
+  heaterOnDiffF: 1.5,
+  heaterOffDiffF: 0.5,
+  constantHumidifierAlwaysOn: false,
+}
+
 export function auxControl(
   aux: AuxState,
   currRh: number,
@@ -215,8 +236,13 @@ export function auxControl(
   lightsOn: boolean,
   hasBoost = true,
   hasHeater = true,
+  cfg: AuxConfig = DEFAULT_AUX_CONFIG,
 ): AuxState {
-  if (!lightsOn) {
+  // ── Humidifiers (Groovy `controlHumidifiers`) ──────────────────────────
+  // Constant runs whenever lights are on OR the stage needs 24/7 humidity
+  // (SEEDLING). Boost only when RH is well below target.
+  const wantConstant = lightsOn || cfg.constantHumidifierAlwaysOn
+  if (!wantConstant) {
     aux.constantHumOn = false
     aux.boostHumOn = false
   } else {
@@ -228,17 +254,18 @@ export function auxControl(
     }
   }
 
-  if (hasHeater) {
-    if (lightsOn) {
-      aux.heaterOn = false
-    } else {
-      const diff = currTempF - targetTempF
-      if (diff < -2) aux.heaterOn = true
-      else if (diff > 0) aux.heaterOn = false
-    }
-  } else {
+  // ── Heater (Groovy `manageHeater`) ─────────────────────────────────────
+  if (!hasHeater) {
     aux.heaterOn = false
+    return aux
   }
+  if (lightsOn && !cfg.heaterAllowLightsOn) {
+    aux.heaterOn = false
+    return aux
+  }
+  const diff = currTempF - targetTempF
+  if (!aux.heaterOn && diff <= -cfg.heaterOnDiffF) aux.heaterOn = true
+  else if (aux.heaterOn && diff >= cfg.heaterOffDiffF) aux.heaterOn = false
 
   return aux
 }
