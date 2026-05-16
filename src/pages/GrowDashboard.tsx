@@ -272,7 +272,6 @@ function VpdReferenceCard() {
 // ── main page ────────────────────────────────────────────────────────────────
 
 export default function GrowDashboard() {
-  const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
   const [selectedHours, setSelectedHours] = useState(6)
   const [readings, setReadings] = useState<Reading[]>([])
@@ -280,7 +279,6 @@ export default function GrowDashboard() {
   const [dimmerReadings, setDimmerReadings] = useState<Reading[]>([])
   const [latestDimmer, setLatestDimmer] = useState<Reading | null>(null)
   const [canopyLatest, setCanopyLatest] = useState<Reading[]>([])
-  const [aqaraLatest, setAqaraLatest] = useState<Reading[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -291,13 +289,12 @@ export default function GrowDashboard() {
     return () => clearInterval(timer)
   }, [])
 
-  // Load device list on mount
+  // Load device list on mount — auto-select Sonoff 2 Canopy
   useEffect(() => {
     fetchDevices().then(devs => {
-      setDevices(devs)
-      if (devs.length > 0) {
-        setSelectedDeviceId(devs[0].device_id)
-      }
+      const canopy = devs.find(d => d.device_name === 'Sonoff 2 Canopy')
+      if (canopy) setSelectedDeviceId(canopy.device_id)
+      else if (devs.length > 0) setSelectedDeviceId(devs[0].device_id)
     })
   }, [])
 
@@ -305,11 +302,9 @@ export default function GrowDashboard() {
   useEffect(() => {
     Promise.all([
       fetchLatestByName('Sonoff 2 Canopy'),
-      fetchLatestByName('Aqara W100'),
       fetchLatestDimmer(),
-    ]).then(([canopy, aqara, dimmer]) => {
+    ]).then(([canopy, dimmer]) => {
       setCanopyLatest(canopy)
-      setAqaraLatest(aqara)
       setLatestDimmer(dimmer)
     })
   }, [refreshKey])
@@ -415,17 +410,6 @@ export default function GrowDashboard() {
 
       {/* Controls */}
       <div className="grow-controls">
-        <select
-          value={selectedDeviceId}
-          onChange={e => setSelectedDeviceId(e.target.value)}
-          className="grow-select"
-        >
-          {devices.length === 0 && <option value="">No devices yet</option>}
-          {devices.map(d => (
-            <option key={d.device_id} value={d.device_id}>{d.device_name}</option>
-          ))}
-        </select>
-
         <div className="time-range-picker">
           {TIME_RANGES.map(r => (
             <button
@@ -460,7 +444,6 @@ export default function GrowDashboard() {
       {/* Device panel rows */}
       <div className="device-rows">
         <DeviceStatRow label="Sonoff 2 Canopy" readings={canopyLatest} now={now} />
-        <DeviceStatRow label="Aqara W100" readings={aqaraLatest} now={now} />
         <div className="device-row">
           <div className="device-row-label">Dimmer</div>
           <div className="device-panels">
