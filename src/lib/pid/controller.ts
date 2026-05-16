@@ -64,9 +64,14 @@ export const DEFAULT_PID_CONFIG: PidConfig = {
   warmSeedFactor: 2.0,
 }
 
+// Groovy `pidFanSpeed` smooths the derivative term with a fixed EMA:
+//   smoothDeriv = 0.3 * rawDeriv + 0.7 * lastDeriv
+const DERIV_SMOOTH_ALPHA = 0.3
+
 export interface PidState {
   integral: number
   lastError: number
+  lastDeriv: number
   lastTimeMs: number | null
   lastVpd: number | null
   lastFanPct: number
@@ -76,6 +81,7 @@ export function makeState(config: PidConfig = DEFAULT_PID_CONFIG): PidState {
   return {
     integral: 0,
     lastError: 0,
+    lastDeriv: 0,
     lastTimeMs: null,
     lastVpd: null,
     lastFanPct: config.fanBasePct,
@@ -105,6 +111,7 @@ export function resetPid(
   const err = Number.isFinite(currRh) ? currRh - targetRh : 0
   state.integral = err * cfg.warmSeedFactor
   state.lastError = err
+  state.lastDeriv = 0
   state.lastTimeMs = nowMs
 }
 
@@ -152,12 +159,15 @@ export function tick(
   let integ = state.integral + error * dt
   integ = Math.max(-cfg.integralMax, Math.min(cfg.integralMax, integ))
 
-  // --- derivative ---------------------------------------------------------
-  const derivative = dt > 0 ? (error - state.lastError) / dt : 0
+  // --- derivative (EMA-smoothed, Groovy `pidFanSpeed`) --------------------
+  const rawDeriv = (error - state.lastError) / dt
+  const smoothDeriv =
+    DERIV_SMOOTH_ALPHA * rawDeriv + (1 - DERIV_SMOOTH_ALPHA) * state.lastDeriv
+  state.lastDeriv = smoothDeriv
 
   const pTerm = cfg.kp * error
   const iTerm = cfg.ki * integ
-  const dTerm = cfg.kd * derivative
+  const dTerm = cfg.kd * smoothDeriv
   const rawOutput = pTerm + iTerm + dTerm
 
   let fan = Math.round(cfg.fanBasePct + rawOutput)
