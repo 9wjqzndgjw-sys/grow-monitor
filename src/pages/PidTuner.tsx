@@ -26,8 +26,26 @@ import {
 import './PidTuner.css'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
+
+const SONOFF_SENSOR = 'Sonoff Hygrometer 1'
+
+// Shown in the dropdown when the DB has no SEEDLING setpoints yet.
+// id < 0 signals "not yet persisted" — simulation runs client-side only.
+const SEEDLING_DEFAULT: SetpointRow = {
+  id: -1,
+  name: 'Seedling default',
+  stage: 'SEEDLING',
+  temp_day_f: 77,
+  temp_night_f: 72,
+  rh_day_pct: 70,
+  rh_night_pct: 65,
+  temp_tol_f: 2,
+  unit_temp: '°F',
+  unit_rh: '%',
+  created_at: '',
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -70,13 +88,14 @@ export default function PidTuner() {
         listDeviceIds(['humidity']),
         listDeviceIds(['dimmer', 'level', 'fan']),
       ])
-      const SONOFF = 'Sonoff Hygrometer 1'
-      const humDevWithSonoff = humDev.includes(SONOFF) ? humDev : [SONOFF, ...humDev]
+      const humDevWithSonoff = humDev.includes(SONOFF_SENSOR) ? humDev : [SONOFF_SENSOR, ...humDev]
+      const hasSeedling = s.some((sp) => sp.stage === 'SEEDLING')
+      const allSetpoints = hasSeedling ? s : [SEEDLING_DEFAULT, ...s]
       setParamSets(p)
-      setSetpoints(s)
+      setSetpoints(allSetpoints)
       setHumidityDevices(humDevWithSonoff)
       setFanDevices(fanDev)
-      setHumidityDevice(SONOFF)
+      setHumidityDevice(SONOFF_SENSOR)
       setFanDevice(fanDev[0] ?? '')
       if (p.length) {
         setSelectedParamId(p[0].id)
@@ -84,7 +103,7 @@ export default function PidTuner() {
         setKi(Number(p[0].ki))
         setKd(Number(p[0].kd))
       }
-      if (s.length) setSelectedSetpointId(s[0].id)
+      setSelectedSetpointId(allSetpoints[0]?.id ?? null)
       loadLeaderboard()
     })()
   }, [])
@@ -149,28 +168,30 @@ export default function PidTuner() {
       setSamples(result.samples)
       setMetrics(m)
 
-      // Persist the run server-side so the leaderboard records it
-      const resp = await fetch('/api/pid/simulate', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          params_id: selectedParamId,
-          setpoint_id: selectedSetpointId,
-          model_humidity_id: modelH.id,
-          model_temp_id: modelT.id,
-          duration_s: durationMin * 60,
-          dt_s: dtS,
-          initial_rh: initialRh,
-          initial_temp_f: initialTempF,
-          lights_on: lightsOn,
-          notes: `live: Kp=${kp} Ki=${ki} Kd=${kd}`,
-        }),
-      })
-      if (!resp.ok) {
-        const body = await apiJson(resp).catch(() => ({}))
-        throw new Error((body as Record<string,unknown>).error as string ?? `Save failed: ${resp.status}`)
+      // Synthetic setpoints (id < 0) aren't in the DB yet — skip persist.
+      if (selectedSetpointId > 0) {
+        const resp = await fetch('/api/pid/simulate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            params_id: selectedParamId,
+            setpoint_id: selectedSetpointId,
+            model_humidity_id: modelH.id,
+            model_temp_id: modelT.id,
+            duration_s: durationMin * 60,
+            dt_s: dtS,
+            initial_rh: initialRh,
+            initial_temp_f: initialTempF,
+            lights_on: lightsOn,
+            notes: `live: Kp=${kp} Ki=${ki} Kd=${kd}`,
+          }),
+        })
+        if (!resp.ok) {
+          const body = await apiJson(resp).catch(() => ({}))
+          throw new Error((body as Record<string,unknown>).error as string ?? `Save failed: ${resp.status}`)
+        }
+        loadLeaderboard()
       }
-      loadLeaderboard()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -320,7 +341,7 @@ export default function PidTuner() {
           >
             {setpoints.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} — {s.stage}
+                {s.name} — {s.stage}{s.id < 0 ? ' *' : ''}
               </option>
             ))}
           </select>
