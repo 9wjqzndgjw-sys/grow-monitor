@@ -25,7 +25,7 @@ export interface PidParamsRow {
 export interface SetpointRow {
   id: number
   name: string
-  stage: 'VEG' | 'FLOWER'
+  stage: 'VEG' | 'FLOWER' | 'SEEDLING'
   temp_day_f: number
   temp_night_f: number
   rh_day_pct: number
