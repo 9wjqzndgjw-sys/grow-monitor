@@ -70,11 +70,13 @@ export default function PidTuner() {
         listDeviceIds(['humidity']),
         listDeviceIds(['dimmer', 'level', 'fan']),
       ])
+      const SONOFF = 'Sonoff Hygrometer 1'
+      const humDevWithSonoff = humDev.includes(SONOFF) ? humDev : [SONOFF, ...humDev]
       setParamSets(p)
       setSetpoints(s)
-      setHumidityDevices(humDev)
+      setHumidityDevices(humDevWithSonoff)
       setFanDevices(fanDev)
-      setHumidityDevice(humDev.find(d => d === 'Sonoff Hygrometer 1') ?? humDev[0] ?? '')
+      setHumidityDevice(SONOFF)
       setFanDevice(fanDev[0] ?? '')
       if (p.length) {
         setSelectedParamId(p[0].id)
