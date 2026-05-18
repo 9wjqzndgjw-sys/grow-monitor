@@ -57,10 +57,11 @@ def resetPID() {
     Float   targetRH  = lightsOn ? targets.rhDay as Float : targets.rhNight as Float
     Float   curRH     = humiditySensor.currentValue("humidity") as Float
     Float   initError = (curRH != null) ? (curRH - targetRH) : 0.0
-    atomicState.integral  = initError * 2.0
-    atomicState.lastError = initError
-    atomicState.lastDeriv = 0.0
-    atomicState.lastTime  = now()
+    atomicState.integral   = initError * 2.0
+    atomicState.lastError  = initError
+    atomicState.lastDeriv  = 0.0
+    atomicState.lastTime   = now()
+    atomicState.lastFanPct = (fanDimmer.currentValue("level") ?: fanBase ?: 30) as Integer
     logDebug("PID seeded — RH:${curRH} target:${targetRH} error:${initError} integral:${atomicState.integral}")
 }
 
@@ -97,10 +98,14 @@ def evaluateClimate() {
 
     boolean tentOpen = vpdDelta > 0.15
     if (tentOpen) {
-        log.info("Tent open detected — VPD delta ${String.format('%.3f',vpdDelta)} kPa — suppressing PID, resetting integral")
-        atomicState.integral  = 0.0
-        atomicState.lastError = 0.0
+        log.info("Tent open detected — VPD delta ${String.format('%.3f',vpdDelta)} kPa — suppressing PID fan, warm-seeding integral")
+        Float initError = curRH - targetRH
+        Float iMax      = (integralMax ?: 15.0) as Float
+        atomicState.integral  = Math.max(-iMax, Math.min(iMax, initError * 2.0)) as Float
+        atomicState.lastError = initError
         atomicState.lastTime  = now()
+        // Still run humidifiers — only the fan PID is suppressed during tent-open
+        controlHumidifiers(curRH, targetRH, lightsOn)
         return
     }
 
@@ -166,9 +171,12 @@ def Integer pidFanSpeed(Float curRH, Float targetRH, Map targets) {
 // ── Fan output ─────────────────────────────────────────────────────────────
 
 def setFanSpeed(Integer speed) {
-    Integer cur = (fanDimmer.currentValue("level") ?: 0) as Integer
+    // Use atomicState to track last commanded speed — currentValue("level") can
+    // return a stale cached value immediately after setLevel(), causing oscillation.
+    Integer cur = (atomicState.lastFanPct ?: fanDimmer.currentValue("level") ?: 0) as Integer
     if (Math.abs(speed - cur) >= 3) {
         fanDimmer.setLevel(speed)
+        atomicState.lastFanPct = speed
         logDebug("Fan → ${speed}%  (was ${cur}%)")
     }
 }
